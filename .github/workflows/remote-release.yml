@@ -1,9 +1,9 @@
 name: Release Remote
 
 on:
-  push:
+  pull_request:
     branches:
-      - gabriel/remote-release-workflow
+      - main
   workflow_dispatch:
     inputs:
       version_type:
