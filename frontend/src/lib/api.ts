@@ -478,7 +478,10 @@ export const attemptsApi = {
     return handleApiResponse<void>(response);
   },
 
-  delete: async (attemptId: string, deleteBranches?: boolean): Promise<void> => {
+  delete: async (
+    attemptId: string,
+    deleteBranches?: boolean
+  ): Promise<void> => {
     const params = new URLSearchParams();
     if (deleteBranches) {
       params.set('delete_branches', 'true');
