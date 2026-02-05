@@ -33,11 +33,13 @@ export type {
   DisplayEntry,
   AggregatedPatchGroup,
   AggregatedDiffGroup,
+  AggregatedThinkingGroup,
 } from '@/hooks/useConversationHistory/types';
 
 export {
   isAggregatedGroup,
   isAggregatedDiffGroup,
+  isAggregatedThinkingGroup,
 } from '@/hooks/useConversationHistory/types';
 
 export const useConversationHistory = ({

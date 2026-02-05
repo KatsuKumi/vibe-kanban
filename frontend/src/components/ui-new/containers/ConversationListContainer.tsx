@@ -25,6 +25,7 @@ import {
   DisplayEntry,
   isAggregatedGroup,
   isAggregatedDiffGroup,
+  isAggregatedThinkingGroup,
   useConversationHistory,
 } from '@/components/ui-new/hooks/useConversationHistory';
 import { aggregateConsecutiveEntries } from '@/utils/aggregateEntries';
@@ -77,6 +78,7 @@ const ItemContent: VirtuosoMessageListProps<
         expansionKey={data.patchKey}
         aggregatedGroup={data}
         aggregatedDiffGroup={null}
+        aggregatedThinkingGroup={null}
         entry={null}
         executionProcessId={data.executionProcessId}
         taskAttempt={attempt}
@@ -91,6 +93,22 @@ const ItemContent: VirtuosoMessageListProps<
         expansionKey={data.patchKey}
         aggregatedGroup={null}
         aggregatedDiffGroup={data}
+        aggregatedThinkingGroup={null}
+        entry={null}
+        executionProcessId={data.executionProcessId}
+        taskAttempt={attempt}
+      />
+    );
+  }
+
+  // Handle aggregated thinking groups (thinking entries in previous turns)
+  if (isAggregatedThinkingGroup(data)) {
+    return (
+      <NewDisplayConversationEntry
+        expansionKey={data.patchKey}
+        aggregatedGroup={null}
+        aggregatedDiffGroup={null}
+        aggregatedThinkingGroup={data}
         entry={null}
         executionProcessId={data.executionProcessId}
         taskAttempt={attempt}
@@ -111,6 +129,7 @@ const ItemContent: VirtuosoMessageListProps<
         entry={data.content}
         aggregatedGroup={null}
         aggregatedDiffGroup={null}
+        aggregatedThinkingGroup={null}
         executionProcessId={data.executionProcessId}
         taskAttempt={attempt}
       />
