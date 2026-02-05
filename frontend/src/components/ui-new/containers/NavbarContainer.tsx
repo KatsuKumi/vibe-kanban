@@ -6,7 +6,7 @@ import { useActions } from '@/contexts/ActionsContext';
 import { useUserOrganizations } from '@/hooks/useUserOrganizations';
 import { useOrganizationStore } from '@/stores/useOrganizationStore';
 import { Navbar } from '../views/Navbar';
-import { RemoteIssueLink } from './RemoteIssueLink';
+import { ProjectBreadcrumb } from './ProjectBreadcrumb';
 import {
   NavbarActionGroups,
   NavbarDivider,
@@ -130,8 +130,8 @@ export function NavbarContainer() {
       leftItems={leftItems}
       rightItems={rightItems}
       leftSlot={
-        linkedRemoteWorkspace?.issue_id ? (
-          <RemoteIssueLink
+        linkedRemoteWorkspace ? (
+          <ProjectBreadcrumb
             projectId={linkedRemoteWorkspace.project_id}
             issueId={linkedRemoteWorkspace.issue_id}
           />
