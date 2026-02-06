@@ -50,12 +50,11 @@ pub enum DiffChangeKind {
 /// Converts a replace diff to a list of unified diff hunks.
 /// Uses a context limit of 3 lines.
 fn create_unified_diff_hunks(old: &str, new: &str) -> Vec<String> {
-    let old = ensure_newline(old);
-    let new = ensure_newline(new);
+    let old = normalize_line_endings(old);
+    let new = normalize_line_endings(new);
 
     let diff = TextDiff::from_lines(&old, &new);
 
-    // Generate unified diff with context
     let unified_diff = diff
         .unified_diff()
         .context_radius(3)
@@ -73,8 +72,8 @@ pub fn create_unified_diff(file_path: &str, old: &str, new: &str) -> String {
 
 /// Compute addition/deletion counts between two text snapshots.
 pub fn compute_line_change_counts(old: &str, new: &str) -> (usize, usize) {
-    let old = ensure_newline(old);
-    let new = ensure_newline(new);
+    let old = normalize_line_endings(old);
+    let new = normalize_line_endings(new);
     let diff = TextDiff::from_lines(old.as_ref(), new.as_ref());
     let mut additions = 0usize;
     let mut deletions = 0usize;
@@ -88,12 +87,17 @@ pub fn compute_line_change_counts(old: &str, new: &str) -> (usize, usize) {
     (additions, deletions)
 }
 
-// ensure a line ends with a newline character
-fn ensure_newline(line: &str) -> Cow<'_, str> {
-    if line.ends_with('\n') {
-        Cow::Borrowed(line)
+fn normalize_line_endings(text: &str) -> Cow<'_, str> {
+    if text.contains('\r') {
+        let mut normalized = text.replace("\r\n", "\n").replace('\r', "\n");
+        if !normalized.ends_with('\n') {
+            normalized.push('\n');
+        }
+        Cow::Owned(normalized)
+    } else if text.ends_with('\n') {
+        Cow::Borrowed(text)
     } else {
-        let mut owned = line.to_owned();
+        let mut owned = text.to_owned();
         owned.push('\n');
         Cow::Owned(owned)
     }
@@ -242,4 +246,61 @@ pub fn concatenate_diff_hunks(file_path: &str, hunks: &[String]) -> String {
 pub fn normalize_unified_diff(file_path: &str, unified_diff: &str) -> String {
     let hunks = extract_unified_diff_hunks(unified_diff);
     concatenate_diff_hunks(file_path, &hunks)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn identical_content_lf_vs_crlf() {
+        let old = "line1\nline2\nline3\n";
+        let new = "line1\r\nline2\r\nline3\r\n";
+        let (additions, deletions) = compute_line_change_counts(old, new);
+        assert_eq!((additions, deletions), (0, 0));
+    }
+
+    #[test]
+    fn crlf_with_actual_modification() {
+        let old = "line1\nline2\nline3\n";
+        let new = "line1\r\nmodified\r\nline3\r\n";
+        let (additions, deletions) = compute_line_change_counts(old, new);
+        assert_eq!((additions, deletions), (1, 1));
+    }
+
+    #[test]
+    fn crlf_with_added_lines() {
+        let old = "line1\nline2\n";
+        let new = "line1\r\nline2\r\nnew_line\r\n";
+        let (additions, deletions) = compute_line_change_counts(old, new);
+        assert_eq!((additions, deletions), (1, 0));
+    }
+
+    #[test]
+    fn both_lf_counts_correctly() {
+        let old = "a\nb\n";
+        let new = "a\nc\n";
+        let (additions, deletions) = compute_line_change_counts(old, new);
+        assert_eq!((additions, deletions), (1, 1));
+    }
+
+    #[test]
+    fn crlf_deleted_lines() {
+        let old = "line1\nline2\nline3\n";
+        let new = "line1\r\n";
+        let (additions, deletions) = compute_line_change_counts(old, new);
+        assert_eq!((additions, deletions), (0, 2));
+    }
+
+    #[test]
+    fn unified_diff_crlf_identical_produces_empty_diff() {
+        let old = "line1\nline2\n";
+        let new = "line1\r\nline2\r\n";
+        let diff = create_unified_diff("test.txt", old, new);
+        let has_change_lines = diff.lines().any(|l| {
+            (l.starts_with('+') && !l.starts_with("+++"))
+                || (l.starts_with('-') && !l.starts_with("---"))
+        });
+        assert!(!has_change_lines);
+    }
 }
