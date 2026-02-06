@@ -223,7 +223,7 @@ function DesktopSimple({
         id="right"
         defaultSize={34}
         minSize={MIN_PANEL_SIZE}
-        className="min-w-0 min-h-0 overflow-hidden"
+        className="min-w-0 min-h-0 overflow-y-auto overflow-x-hidden"
       >
         <RightWorkArea
           attempt={attempt}
