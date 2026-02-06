@@ -105,9 +105,6 @@
   "error": "錯誤",
   "signIn": "登入",
   "signOut": "登出",
-  "devMode": {
-    "banner": "開發模式 - 這是開發版本"
-  },
   "oauth": {
     "title": "登入 Vibe Kanban",
     "description": "登入以加入組織並與團隊共享任務",

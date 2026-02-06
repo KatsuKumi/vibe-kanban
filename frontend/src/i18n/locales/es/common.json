@@ -108,9 +108,6 @@
   "error": "Error",
   "signIn": "Iniciar sesión",
   "signOut": "Cerrar sesión",
-  "devMode": {
-    "banner": "Modo de Desarrollo - Esta es una compilación de desarrollo"
-  },
   "oauth": {
     "title": "Iniciar sesión en Vibe Kanban",
     "description": "Inicia sesión para unirte a organizaciones y compartir tareas con tu equipo",

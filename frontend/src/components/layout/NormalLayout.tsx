@@ -1,5 +1,4 @@
 import { Outlet, useSearchParams } from 'react-router-dom';
-import { DevBanner } from '@/components/DevBanner';
 import { Navbar } from '@/components/layout/Navbar';
 
 export function NormalLayout() {
@@ -10,7 +9,6 @@ export function NormalLayout() {
   return (
     <>
       <div className="flex flex-col h-screen">
-        <DevBanner />
         {!shouldHideNavbar && <Navbar />}
         <div className="flex-1 overflow-auto">
           <Outlet />

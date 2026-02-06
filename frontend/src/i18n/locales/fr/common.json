@@ -108,9 +108,6 @@
   "error": "Erreur",
   "signIn": "Se connecter",
   "signOut": "Se déconnecter",
-  "devMode": {
-    "banner": "Mode développement - Ceci est une version de développement"
-  },
   "oauth": {
     "title": "Se connecter à Vibe Kanban",
     "description": "Connectez-vous pour rejoindre des organisations et partager des tâches avec votre équipe",
