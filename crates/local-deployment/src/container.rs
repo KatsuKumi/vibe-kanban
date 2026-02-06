@@ -1151,6 +1151,7 @@ impl ContainerService for LocalContainerService {
             .commit_reminder_prompt
             .clone()
             .unwrap_or_else(|| DEFAULT_COMMIT_REMINDER_PROMPT.to_string());
+        let claude_agent_teams = config.claude_agent_teams;
         drop(config);
         let mut env = ExecutionEnv::new(
             repo_context,
@@ -1176,6 +1177,15 @@ impl ContainerService for LocalContainerService {
         env.insert("VK_WORKSPACE_ID", workspace.id.to_string());
         env.insert("VK_WORKSPACE_BRANCH", &workspace.branch);
         env.insert("VK_SESSION_ID", execution_process.session_id.to_string());
+
+        if claude_agent_teams
+            && matches!(
+                executor_action.base_executor(),
+                Some(BaseCodingAgent::ClaudeCode)
+            )
+        {
+            env.insert("CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS", "1");
+        }
 
         // Create the child and stream, add to execution tracker with timeout
         let mut spawned = tokio::time::timeout(

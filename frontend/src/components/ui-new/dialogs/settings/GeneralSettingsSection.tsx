@@ -926,6 +926,14 @@ export function GeneralSettingsSection() {
           checked={draft?.beta_workspaces ?? false}
           onChange={(checked) => updateDraft({ beta_workspaces: checked })}
         />
+
+        <SettingsCheckbox
+          id="claude-agent-teams"
+          label={t('settings.general.beta.agentTeams.label')}
+          description={t('settings.general.beta.agentTeams.helper')}
+          checked={draft?.claude_agent_teams ?? false}
+          onChange={(checked) => updateDraft({ claude_agent_teams: checked })}
+        />
       </SettingsCard>
 
       <SettingsSaveBar

@@ -71,6 +71,8 @@ pub struct Config {
     pub ai_commit_message_enabled: bool,
     #[serde(default)]
     pub ai_commit_message_prompt: Option<String>,
+    #[serde(default)]
+    pub claude_agent_teams: bool,
 }
 
 impl Config {
@@ -100,6 +102,7 @@ impl Config {
             font_family: None,
             ai_commit_message_enabled: true,
             ai_commit_message_prompt: None,
+            claude_agent_teams: false,
         }
     }
 
@@ -157,6 +160,7 @@ impl Default for Config {
             font_family: None,
             ai_commit_message_enabled: true,
             ai_commit_message_prompt: None,
+            claude_agent_teams: false,
         }
     }
 }
