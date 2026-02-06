@@ -20,6 +20,12 @@
         "CLAUDE_CODE": {
           "approvals": true
         }
+      },
+      "TEAMS": {
+        "CLAUDE_CODE": {
+          "agent_teams": true,
+          "dangerously_skip_permissions": true
+        }
       }
     },
     "AMP": {

@@ -76,6 +76,12 @@ pub struct ClaudeCode {
     pub dangerously_skip_permissions: Option<bool>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub disable_api_key: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schemars(
+        title = "Agent Teams",
+        description = "Enable Claude Agent Teams to allow multiple Claude Code instances to coordinate and work together on tasks"
+    )]
+    pub agent_teams: Option<bool>,
     #[serde(flatten)]
     pub cmd: CmdOverrides,
 
@@ -319,6 +325,10 @@ impl ClaudeCode {
         if self.disable_api_key.unwrap_or(false) {
             command.env_remove("ANTHROPIC_API_KEY");
             tracing::info!("ANTHROPIC_API_KEY removed from environment");
+        }
+
+        if self.agent_teams.unwrap_or(false) {
+            command.env("CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS", "1");
         }
 
         let mut child = command.group_spawn()?;
@@ -2378,6 +2388,7 @@ mod tests {
             },
             approvals_service: None,
             disable_api_key: None,
+            agent_teams: None,
         };
         let msg_store = Arc::new(MsgStore::new());
         let current_dir = std::path::PathBuf::from("/tmp/test-worktree");
