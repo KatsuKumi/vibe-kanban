@@ -143,7 +143,6 @@ export function ProjectTasks() {
 
   const {
     projectId,
-    project,
     isLoading: projectLoading,
     error: projectError,
   } = useProject();

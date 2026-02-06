@@ -23,6 +23,7 @@ import {
 import { useDiffStream } from '@/hooks/useDiffStream';
 import { attemptsApi } from '@/lib/api';
 import { useDiffViewStore } from '@/stores/useDiffViewStore';
+import { computeAggregateDiffStats } from '@/utils/computeDiffStats';
 import type {
   Workspace as ApiWorkspace,
   Session,
@@ -166,14 +167,14 @@ export function WorkspaceProvider({ children }: WorkspaceProviderProps) {
     return () => useDiffViewStore.getState().setDiffPaths([]);
   }, [diffPaths]);
 
-  const diffStats: DiffStats = useMemo(
-    () => ({
-      files_changed: diffs.length,
-      lines_added: diffs.reduce((sum, d) => sum + (d.additions ?? 0), 0),
-      lines_removed: diffs.reduce((sum, d) => sum + (d.deletions ?? 0), 0),
-    }),
-    [diffs]
-  );
+  const diffStats: DiffStats = useMemo(() => {
+    const stats = computeAggregateDiffStats(diffs);
+    return {
+      files_changed: stats.filesChanged,
+      lines_added: stats.linesAdded,
+      lines_removed: stats.linesRemoved,
+    };
+  }, [diffs]);
 
   const isLoading = isLoadingList || isLoadingWorkspace;
 

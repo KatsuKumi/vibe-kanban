@@ -640,6 +640,16 @@ impl GitService {
         }
     }
 
+    fn read_file_to_string_no_size_limit(repo: &Repository, rel_path: &Path) -> Option<String> {
+        let workdir = repo.workdir()?;
+        let abs_path = workdir.join(rel_path);
+        let bytes = std::fs::read(&abs_path).ok()?;
+        if bytes.contains(&0) {
+            return None;
+        }
+        String::from_utf8(bytes).ok()
+    }
+
     /// Create FileDiffDetails from path and blob with filesystem fallback
     fn create_file_details(
         &self,
@@ -763,19 +773,35 @@ impl GitService {
             change = DiffChangeKind::PermissionChange;
         }
 
-        // Compute line stats from available content
         let (additions, deletions) = match (&old_content, &new_content) {
             (Some(old), Some(new)) => {
                 let (adds, dels) = compute_line_change_counts(old, new);
                 (Some(adds), Some(dels))
             }
-            (Some(old), None) => {
-                // File deleted - all lines are deletions
-                (Some(0), Some(old.lines().count()))
-            }
-            (None, Some(new)) => {
-                // File added - all lines are additions
-                (Some(new.lines().count()), Some(0))
+            (Some(old), None) => (Some(0), Some(old.lines().count())),
+            (None, Some(new)) => (Some(new.lines().count()), Some(0)),
+            (None, None) if content_omitted => {
+                let old_for_stats = old_path_opt.as_ref().and_then(|p| {
+                    let rel = std::path::Path::new(p);
+                    base_tree
+                        .get_path(rel)
+                        .ok()
+                        .filter(|e| e.kind() == Some(git2::ObjectType::Blob))
+                        .and_then(|e| repo.find_blob(e.id()).ok())
+                        .and_then(|b| Self::blob_to_string(&b))
+                });
+                let new_for_stats = new_path_opt.as_ref().and_then(|p| {
+                    Self::read_file_to_string_no_size_limit(repo, std::path::Path::new(p))
+                });
+                match (old_for_stats, new_for_stats) {
+                    (Some(old), Some(new)) => {
+                        let (a, d) = compute_line_change_counts(&old, &new);
+                        (Some(a), Some(d))
+                    }
+                    (Some(old), None) => (Some(0), Some(old.lines().count())),
+                    (None, Some(new)) => (Some(new.lines().count()), Some(0)),
+                    (None, None) => (None, None),
+                }
             }
             (None, None) => (None, None),
         };

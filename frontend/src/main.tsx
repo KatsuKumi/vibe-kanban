@@ -7,7 +7,7 @@ import {
   QueryClientProvider,
   QueryCache,
 } from '@tanstack/react-query';
-import i18n from './i18n';
+import './i18n';
 import './types/modals';
 
 export const queryClient = new QueryClient({

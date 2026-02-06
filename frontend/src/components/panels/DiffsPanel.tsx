@@ -5,7 +5,7 @@ import { Loader } from '@/components/ui/loader';
 import { Button } from '@/components/ui/button';
 import DiffViewSwitch from '@/components/DiffViewSwitch';
 import DiffCard from '@/components/DiffCard';
-import { useDiffSummary } from '@/hooks/useDiffSummary';
+import { computeAggregateDiffStats } from '@/utils/computeDiffStats';
 import { NewCardHeader } from '@/components/ui/new-card';
 import { ChevronsUp, ChevronsDown } from 'lucide-react';
 import {
@@ -56,9 +56,14 @@ export function DiffsPanel({ selectedAttempt, gitOps }: DiffsPanelProps) {
   const [collapsedIds, setCollapsedIds] = useState<Set<string>>(new Set());
   const [processedIds, setProcessedIds] = useState<Set<string>>(new Set());
   const { diffs, error } = useDiffStream(selectedAttempt?.id ?? null, true);
-  const { fileCount, added, deleted } = useDiffSummary(
-    selectedAttempt?.id ?? null
-  );
+  const { fileCount, added, deleted } = useMemo(() => {
+    const stats = computeAggregateDiffStats(diffs);
+    return {
+      fileCount: stats.filesChanged,
+      added: stats.linesAdded,
+      deleted: stats.linesRemoved,
+    };
+  }, [diffs]);
 
   // If no diffs arrive within 3 seconds, stop showing the spinner
   useEffect(() => {
