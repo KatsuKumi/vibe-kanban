@@ -47,9 +47,7 @@ export function useActionVisibilityContext(): ActionVisibilityContext {
   const location = useLocation();
   const layoutMode: LayoutMode = location.pathname.startsWith('/projects')
     ? 'kanban'
-    : location.pathname.startsWith('/migrate')
-      ? 'migrate'
-      : 'workspaces';
+    : 'workspaces';
   const { config } = useUserSystem();
   const { isStarting, isStopping, runningDevServers } =
     useDevServer(workspaceId);

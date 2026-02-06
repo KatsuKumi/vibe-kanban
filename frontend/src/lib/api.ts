@@ -93,8 +93,6 @@ import {
   CreateWorkspaceFromPrBody,
   CreateWorkspaceFromPrResponse,
   CreateFromPrError,
-  MigrationRequest,
-  MigrationResponse,
 } from 'shared/types';
 import type { WorkspaceWithSession } from '@/types/attempt';
 import { createWorkspaceWithSession } from '@/types/attempt';
@@ -1411,16 +1409,6 @@ export const queueApi = {
   },
 };
 
-// Migration API
-export const migrationApi = {
-  start: async (data: MigrationRequest): Promise<MigrationResponse> => {
-    const response = await makeRequest('/api/migration/start', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    });
-    return handleApiResponse<MigrationResponse>(response);
-  },
-};
 
 // Search API (multi-repo file search)
 export const searchApi = {

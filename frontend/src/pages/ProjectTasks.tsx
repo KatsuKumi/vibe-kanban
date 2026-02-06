@@ -5,10 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import {
   AlertTriangle,
-  Cloud,
-  ExternalLink,
   Plus,
-  Sparkles,
 } from 'lucide-react';
 import { Loader } from '@/components/ui/loader';
 import { tasksApi } from '@/lib/api';
@@ -73,7 +70,6 @@ import {
 } from '@/components/ui/breadcrumb';
 import { AttemptHeaderActions } from '@/components/panels/AttemptHeaderActions';
 import { TaskPanelHeaderActions } from '@/components/panels/TaskPanelHeaderActions';
-import { useSelectedOrgId } from '@/stores/useOrganizationStore';
 
 import type { TaskWithAttemptStatus, TaskStatus } from 'shared/types';
 
@@ -154,7 +150,6 @@ export function ProjectTasks() {
     isLoading: projectLoading,
     error: projectError,
   } = useProject();
-  const selectedOrgId = useSelectedOrgId();
 
   useEffect(() => {
     enableScope(Scope.KANBAN);
@@ -935,64 +930,6 @@ export function ProjectTasks() {
           </AlertTitle>
           <AlertDescription>{streamError}</AlertDescription>
         </Alert>
-      )}
-
-      {config?.beta_workspaces && (
-        <div className="mx-4 my-4 flex justify-center">
-          <div className="max-w-2xl w-full p-3 border border-orange-500/30 bg-orange-500/5 rounded flex items-center gap-4">
-            <div className="flex items-center gap-3 flex-1">
-              {project?.remote_project_id ? (
-                <Cloud className="h-5 w-5 text-orange-500" />
-              ) : (
-                <Sparkles className="h-5 w-5 text-orange-500" />
-              )}
-              <div>
-                {project?.remote_project_id ? (
-                  <>
-                    <p className="text-sm font-medium">
-                      Project migrated to Cloud
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      Access collaboration, tags, priorities, and more
-                    </p>
-                  </>
-                ) : (
-                  <>
-                    <p className="text-sm font-medium">
-                      Migrate this project to the cloud
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      Get collaboration, tags, priorities, sub-issues and more
-                    </p>
-                  </>
-                )}
-              </div>
-            </div>
-            {project?.remote_project_id ? (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() =>
-                  navigate(
-                    `/projects/${project.remote_project_id}${selectedOrgId ? `?orgId=${selectedOrgId}` : ''}`
-                  )
-                }
-                className="flex items-center gap-1.5"
-              >
-                View project
-                <ExternalLink className="h-3.5 w-3.5" />
-              </Button>
-            ) : (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => navigate('/migrate')}
-              >
-                Learn more
-              </Button>
-            )}
-          </div>
-        </div>
       )}
 
       <div className="flex-1 min-h-0">{attemptArea}</div>

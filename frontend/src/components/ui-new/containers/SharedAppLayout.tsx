@@ -56,12 +56,6 @@ export function SharedAppLayout() {
 
   // Navigate to latest project when org changes
   useEffect(() => {
-    // Skip auto-navigation when on migration flow
-    if (location.pathname.startsWith('/migrate')) {
-      prevOrgIdRef.current = selectedOrgId;
-      return;
-    }
-
     if (
       prevOrgIdRef.current !== null &&
       prevOrgIdRef.current !== selectedOrgId &&

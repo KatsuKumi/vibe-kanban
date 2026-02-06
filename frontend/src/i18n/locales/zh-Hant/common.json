@@ -98,8 +98,7 @@
     "currentBadge": "（目前）",
     "organizations": "組織",
     "createOrganization": "建立組織",
-    "orgSettings": "組織設定",
-    "migrate": "遷移"
+    "orgSettings": "組織設定"
   },
   "ok": "確定",
   "error": "錯誤",

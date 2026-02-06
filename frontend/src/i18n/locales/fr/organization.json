@@ -19,10 +19,7 @@
     "rolePlaceholder": "Sélectionner un rôle",
     "roleHelper": "Les administrateurs peuvent gérer les membres et les paramètres de l'organisation.",
     "sending": "Envoi en cours...",
-    "sendButton": "Envoyer l'invitation",
-    "subscriptionRequired": "Abonnement requis pour ajouter plus de membres",
-    "upgradePrompt": "Mettez à niveau le plan de votre organisation pour inviter des membres supplémentaires.",
-    "upgradeButton": "Mettre à niveau"
+    "sendButton": "Envoyer l'invitation"
   },
   "roles": {
     "member": "Membre",
@@ -77,12 +74,6 @@
     "linked": "Lié",
     "linkProject": "Lier un projet...",
     "noAvailableProjects": "Aucun projet disponible"
-  },
-  "billing": {
-    "title": "Facturation et abonnement",
-    "description": "Gérez l'abonnement et les paramètres de facturation de votre organisation",
-    "manageButton": "Gérer la facturation",
-    "openInBrowser": "S'ouvre dans un nouvel onglet du navigateur"
   },
   "personalOrg": {
     "cannotInvite": "Les organisations personnelles ne peuvent pas avoir de membres supplémentaires.",

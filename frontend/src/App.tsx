@@ -5,7 +5,6 @@ import i18n from '@/i18n';
 import { Projects } from '@/pages/Projects';
 import { ProjectTasks } from '@/pages/ProjectTasks';
 import { FullAttemptLogsPage } from '@/pages/FullAttemptLogs';
-import { Migration } from '@/pages/Migration';
 import { NormalLayout } from '@/components/layout/NormalLayout';
 import { SharedAppLayout } from '@/components/ui-new/containers/SharedAppLayout';
 import { usePostHog } from 'posthog-js/react';
@@ -49,7 +48,6 @@ import { VSCodeWorkspacePage } from '@/pages/ui-new/VSCodeWorkspacePage';
 import { WorkspacesLanding } from '@/pages/ui-new/WorkspacesLanding';
 import { ElectricTestPage } from '@/pages/ui-new/ElectricTestPage';
 import { ProjectKanban } from '@/pages/ui-new/ProjectKanban';
-import { MigratePage } from '@/pages/ui-new/MigratePage';
 
 const SentryRoutes = Sentry.withSentryReactRouterV6Routing(Routes);
 
@@ -160,7 +158,6 @@ function AppContent() {
               <Route path="/" element={<Projects />} />
               <Route path="/local-projects" element={<Projects />} />
               <Route path="/local-projects/:projectId" element={<Projects />} />
-              <Route path="/migration" element={<Migration />} />
               <Route
                 path="/local-projects/:projectId/tasks"
                 element={<ProjectTasks />}
@@ -230,8 +227,6 @@ function AppContent() {
                 element={<ProjectKanban />}
               />
 
-              {/* Migration route */}
-              <Route path="/migrate" element={<MigratePage />} />
             </Route>
           </SentryRoutes>
         </SearchProvider>
