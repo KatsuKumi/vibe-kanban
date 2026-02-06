@@ -504,23 +504,32 @@ pub async fn merge_task_attempt(
     let task_uuid_str = task.id.to_string();
     let first_uuid_section = task_uuid_str.split('-').next().unwrap_or(&task_uuid_str);
 
-    let mut commit_message = format!("{} (vibe-kanban {})", task.title, first_uuid_section);
-
-    // Add description on next line if it exists
-    if let Some(description) = &task.description
-        && !description.trim().is_empty()
-    {
-        commit_message.push_str("\n\n");
-        commit_message.push_str(description);
-    }
-
-    let merge_commit_id = deployment.git().merge_changes(
+    let commit_message = generate_or_fallback_commit_message(
+        &deployment,
         &repo.path,
-        &worktree_path,
         &workspace.branch,
         &workspace_repo.target_branch,
-        &commit_message,
-    )?;
+        &task,
+        first_uuid_section,
+    )
+    .await;
+
+    let merge_commit_id = deployment
+        .git()
+        .merge_changes(
+            &repo.path,
+            &worktree_path,
+            &workspace.branch,
+            &workspace_repo.target_branch,
+            &commit_message,
+        )
+        .map_err(|e| {
+            tracing::error!(
+                "merge_changes failed for workspace {}: {e:?}",
+                workspace.id
+            );
+            e
+        })?;
 
     Merge::create_direct(
         pool,
@@ -1800,6 +1809,113 @@ pub async fn unlink_workspace(
         }
         Err(e) => Err(e.into()),
     }
+}
+
+fn build_fallback_commit_message(task: &Task, uuid_section: &str) -> String {
+    let mut msg = format!("{} (vibe-kanban {})", task.title, uuid_section);
+    if let Some(description) = &task.description
+        && !description.trim().is_empty()
+    {
+        msg.push_str("\n\n");
+        msg.push_str(description);
+    }
+    msg
+}
+
+async fn generate_or_fallback_commit_message(
+    deployment: &DeploymentImpl,
+    repo_path: &PathBuf,
+    branch_name: &str,
+    base_branch: &str,
+    task: &Task,
+    uuid_section: &str,
+) -> String {
+    let ai_enabled = {
+        let config = deployment.config().read().await;
+        config.ai_commit_message_enabled
+    };
+
+    if !ai_enabled {
+        return build_fallback_commit_message(task, uuid_section);
+    }
+
+    let custom_prompt = {
+        let config = deployment.config().read().await;
+        config.ai_commit_message_prompt.clone()
+    };
+
+    match try_generate_ai_commit_message(
+        deployment,
+        repo_path,
+        branch_name,
+        base_branch,
+        task,
+        uuid_section,
+        custom_prompt.as_deref(),
+    )
+    .await
+    {
+        Ok(msg) => msg,
+        Err(e) => {
+            tracing::warn!("AI commit message generation failed, using fallback: {e}");
+            build_fallback_commit_message(task, uuid_section)
+        }
+    }
+}
+
+async fn try_generate_ai_commit_message(
+    deployment: &DeploymentImpl,
+    repo_path: &PathBuf,
+    branch_name: &str,
+    base_branch: &str,
+    task: &Task,
+    uuid_section: &str,
+    custom_prompt: Option<&str>,
+) -> Result<String, String> {
+    let git = deployment.git().clone();
+    let repo_path = repo_path.clone();
+    let branch = branch_name.to_string();
+    let base = base_branch.to_string();
+
+    let diffs = tokio::task::spawn_blocking(move || {
+        git.get_diffs(
+            git::DiffTarget::Branch {
+                repo_path: &repo_path,
+                branch_name: &branch,
+                base_branch: &base,
+            },
+            None,
+        )
+    })
+    .await
+    .map_err(|e| format!("spawn_blocking failed: {e}"))?
+    .map_err(|e| format!("git diff failed: {e}"))?;
+
+    if diffs.is_empty() {
+        return Err("no diffs found".to_string());
+    }
+
+    let diff_text = utils::diff::diffs_to_summary_text(&diffs, 100_000);
+    if diff_text.trim().is_empty() {
+        return Err("diff text is empty".to_string());
+    }
+
+    let raw_message = services::services::commit_message::generate_commit_message(
+        &diff_text,
+        &task.title,
+        task.description.as_deref(),
+        custom_prompt,
+    )
+    .await
+    .map_err(|e| e.to_string())?;
+
+    let first_line_end = raw_message.find('\n').unwrap_or(raw_message.len());
+    let first_line = &raw_message[..first_line_end];
+    let rest = &raw_message[first_line_end..];
+
+    Ok(format!(
+        "{first_line} (vibe-kanban {uuid_section}){rest}"
+    ))
 }
 
 pub fn router(deployment: &DeploymentImpl) -> Router<DeploymentImpl> {

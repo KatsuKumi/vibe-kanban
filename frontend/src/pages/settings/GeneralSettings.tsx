@@ -22,6 +22,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Checkbox } from '@/components/ui/checkbox';
 import { FolderOpen, Loader2, Volume2 } from 'lucide-react';
 import {
+  DEFAULT_COMMIT_MESSAGE_PROMPT,
   DEFAULT_PR_DESCRIPTION_PROMPT,
   EditorType,
   SoundFile,
@@ -573,6 +574,78 @@ export function GeneralSettings() {
             />
             <p className="text-sm text-muted-foreground">
               {t('settings.general.pullRequests.customPrompt.helper')}
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>{t('settings.general.commits.title')}</CardTitle>
+          <CardDescription>
+            {t('settings.general.commits.description')}
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-center space-x-2">
+            <Checkbox
+              id="ai-commit-message"
+              checked={draft?.ai_commit_message_enabled ?? true}
+              onCheckedChange={(checked: boolean) =>
+                updateDraft({ ai_commit_message_enabled: checked })
+              }
+            />
+            <div className="space-y-0.5">
+              <Label htmlFor="ai-commit-message" className="cursor-pointer">
+                {t('settings.general.commits.aiCommitMessage.label')}
+              </Label>
+              <p className="text-sm text-muted-foreground">
+                {t('settings.general.commits.aiCommitMessage.helper')}
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center space-x-2">
+            <Checkbox
+              id="use-custom-ai-commit-prompt"
+              checked={draft?.ai_commit_message_prompt != null}
+              onCheckedChange={(checked: boolean) => {
+                if (checked) {
+                  updateDraft({
+                    ai_commit_message_prompt: DEFAULT_COMMIT_MESSAGE_PROMPT,
+                  });
+                } else {
+                  updateDraft({ ai_commit_message_prompt: null });
+                }
+              }}
+            />
+            <Label
+              htmlFor="use-custom-ai-commit-prompt"
+              className="cursor-pointer"
+            >
+              {t('settings.general.commits.aiCommitPrompt.useCustom')}
+            </Label>
+          </div>
+          <div className="space-y-2">
+            <textarea
+              id="ai-commit-custom-prompt"
+              className={`flex min-h-[100px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${
+                draft?.ai_commit_message_prompt == null
+                  ? 'opacity-50 cursor-not-allowed'
+                  : ''
+              }`}
+              value={
+                draft?.ai_commit_message_prompt ??
+                DEFAULT_COMMIT_MESSAGE_PROMPT
+              }
+              disabled={draft?.ai_commit_message_prompt == null}
+              onChange={(e) =>
+                updateDraft({
+                  ai_commit_message_prompt: e.target.value,
+                })
+              }
+            />
+            <p className="text-sm text-muted-foreground">
+              {t('settings.general.commits.aiCommitPrompt.helper')}
             </p>
           </div>
         </CardContent>

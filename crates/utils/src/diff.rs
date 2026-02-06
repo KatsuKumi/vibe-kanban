@@ -248,6 +248,69 @@ pub fn normalize_unified_diff(file_path: &str, unified_diff: &str) -> String {
     concatenate_diff_hunks(file_path, &hunks)
 }
 
+pub fn diffs_to_summary_text(diffs: &[Diff], max_bytes: usize) -> String {
+    let mut result = String::new();
+
+    for diff in diffs {
+        if result.len() >= max_bytes {
+            break;
+        }
+
+        let path = diff
+            .new_path
+            .as_deref()
+            .or(diff.old_path.as_deref())
+            .unwrap_or("unknown");
+
+        match diff.change {
+            DiffChangeKind::Modified | DiffChangeKind::Copied => {
+                if let (Some(old), Some(new)) = (&diff.old_content, &diff.new_content) {
+                    result.push_str(&create_unified_diff(path, old, new));
+                } else if let (Some(adds), Some(dels)) = (diff.additions, diff.deletions) {
+                    result.push_str(&format!(
+                        "--- a/{path}\n+++ b/{path}\n(content omitted: +{adds} -{dels})\n"
+                    ));
+                }
+            }
+            DiffChangeKind::Added => {
+                if let Some(content) = &diff.new_content {
+                    let preview: String = content.lines().take(50).collect::<Vec<_>>().join("\n");
+                    result.push_str(&format!("+++ b/{path} (new file)\n{preview}\n"));
+                } else {
+                    result.push_str(&format!("+++ b/{path} (new file)\n"));
+                }
+            }
+            DiffChangeKind::Deleted => {
+                result.push_str(&format!("--- a/{path} (deleted)\n"));
+            }
+            DiffChangeKind::Renamed => {
+                let old = diff.old_path.as_deref().unwrap_or("unknown");
+                result.push_str(&format!("renamed: {old} -> {path}\n"));
+                if let (Some(old_content), Some(new_content)) =
+                    (&diff.old_content, &diff.new_content)
+                {
+                    if old_content != new_content {
+                        result.push_str(&create_unified_diff(path, old_content, new_content));
+                    }
+                }
+            }
+            DiffChangeKind::PermissionChange => {
+                result.push_str(&format!("{path} (permission change)\n"));
+            }
+        }
+    }
+
+    if result.len() > max_bytes {
+        result.truncate(max_bytes);
+        if let Some(last_newline) = result.rfind('\n') {
+            result.truncate(last_newline + 1);
+        }
+        result.push_str("... (truncated)\n");
+    }
+
+    result
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

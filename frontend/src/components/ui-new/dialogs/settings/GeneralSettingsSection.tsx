@@ -9,6 +9,7 @@ import {
 import { FolderPickerDialog } from '@/components/dialogs/shared/FolderPickerDialog';
 import {
   type BaseCodingAgent,
+  DEFAULT_COMMIT_MESSAGE_PROMPT,
   DEFAULT_COMMIT_REMINDER_PROMPT,
   DEFAULT_PR_DESCRIPTION_PROMPT,
   EditorType,
@@ -690,6 +691,53 @@ export function GeneralSettingsSection() {
                   updateDraft({ commit_reminder_prompt: value })
                 }
                 disabled={draft?.commit_reminder_prompt == null}
+              />
+            </SettingsField>
+          </>
+        )}
+
+        <SettingsCheckbox
+          id="ai-commit-message"
+          label={t('settings.general.commits.aiCommitMessage.label')}
+          description={t('settings.general.commits.aiCommitMessage.helper')}
+          checked={draft?.ai_commit_message_enabled ?? true}
+          onChange={(checked) =>
+            updateDraft({ ai_commit_message_enabled: checked })
+          }
+        />
+
+        {draft?.ai_commit_message_enabled && (
+          <>
+            <SettingsCheckbox
+              id="use-custom-ai-commit-prompt"
+              label={t('settings.general.commits.aiCommitPrompt.useCustom')}
+              checked={draft?.ai_commit_message_prompt != null}
+              onChange={(checked) => {
+                if (checked) {
+                  updateDraft({
+                    ai_commit_message_prompt: DEFAULT_COMMIT_MESSAGE_PROMPT,
+                  });
+                } else {
+                  updateDraft({ ai_commit_message_prompt: null });
+                }
+              }}
+            />
+
+            <SettingsField
+              label=""
+              description={t(
+                'settings.general.commits.aiCommitPrompt.helper'
+              )}
+            >
+              <SettingsTextarea
+                value={
+                  draft?.ai_commit_message_prompt ??
+                  DEFAULT_COMMIT_MESSAGE_PROMPT
+                }
+                onChange={(value) =>
+                  updateDraft({ ai_commit_message_prompt: value })
+                }
+                disabled={draft?.ai_commit_message_prompt == null}
               />
             </SettingsField>
           </>

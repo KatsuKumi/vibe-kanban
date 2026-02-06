@@ -178,6 +178,14 @@
         "customPrompt": {
           "useCustom": "使用自定义提示",
           "helper": "提交提醒的自定义提示。git 状态将自动追加。"
+        },
+        "aiCommitMessage": {
+          "label": "AI-generated merge commit messages",
+          "helper": "Generate commit messages from actual code changes when merging."
+        },
+        "aiCommitPrompt": {
+          "useCustom": "Use custom prompt",
+          "helper": "Custom system prompt for generating commit messages from diffs."
         }
       },
       "notifications": {

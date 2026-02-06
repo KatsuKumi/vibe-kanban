@@ -21,6 +21,10 @@ fn default_commit_reminder_enabled() -> bool {
     true
 }
 
+fn default_ai_commit_message_enabled() -> bool {
+    true
+}
+
 #[derive(Clone, Debug, Default, Serialize, Deserialize, TS, PartialEq, Eq)]
 pub enum SendMessageShortcut {
     #[default]
@@ -63,6 +67,10 @@ pub struct Config {
     pub send_message_shortcut: SendMessageShortcut,
     #[serde(default)]
     pub font_family: Option<String>,
+    #[serde(default = "default_ai_commit_message_enabled")]
+    pub ai_commit_message_enabled: bool,
+    #[serde(default)]
+    pub ai_commit_message_prompt: Option<String>,
 }
 
 impl Config {
@@ -90,6 +98,8 @@ impl Config {
             commit_reminder_prompt: None,
             send_message_shortcut: SendMessageShortcut::default(),
             font_family: None,
+            ai_commit_message_enabled: true,
+            ai_commit_message_prompt: None,
         }
     }
 
@@ -145,6 +155,8 @@ impl Default for Config {
             commit_reminder_prompt: None,
             send_message_shortcut: SendMessageShortcut::default(),
             font_family: None,
+            ai_commit_message_enabled: true,
+            ai_commit_message_prompt: None,
         }
     }
 }

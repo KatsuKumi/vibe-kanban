@@ -424,6 +424,10 @@ impl IntoResponse for ApiError {
             ),
         };
 
+        if info.status == StatusCode::INTERNAL_SERVER_ERROR {
+            tracing::error!("[{}] {:?}", info.error_type, self);
+        }
+
         let message = info
             .message
             .unwrap_or_else(|| format!("{}: {}", info.error_type, self));
