@@ -47,6 +47,14 @@
         "null"
       ]
     },
+    "agent_teams": {
+      "title": "Agent Teams",
+      "description": "Enable Claude Agent Teams to allow multiple Claude Code instances to coordinate and work together on tasks",
+      "type": [
+        "boolean",
+        "null"
+      ]
+    },
     "base_command_override": {
       "title": "Base Command Override",
       "description": "Override the base command with a custom command",
