@@ -170,6 +170,14 @@ export function Navbar() {
                 Discord
               </span>
             </a>
+            {project && (
+              <>
+                <NavDivider />
+                <span className="text-sm font-medium text-foreground truncate max-w-[200px]">
+                  {project.name}
+                </span>
+              </>
+            )}
           </div>
 
           <div className="hidden sm:flex items-center gap-2">
