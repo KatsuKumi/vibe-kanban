@@ -5,6 +5,7 @@ import { useUserContext } from '@/contexts/remote/UserContext';
 import { useActions } from '@/contexts/ActionsContext';
 import { useUserOrganizations } from '@/hooks/useUserOrganizations';
 import { useOrganizationStore } from '@/stores/useOrganizationStore';
+import { useTask } from '@/hooks/useTask';
 import { Navbar } from '../views/Navbar';
 import { ProjectBreadcrumb } from './ProjectBreadcrumb';
 import {
@@ -68,7 +69,9 @@ export function NavbarContainer() {
   const location = useLocation();
   const isOnProjectPage = location.pathname.startsWith('/projects/');
 
-  // Find remote workspace linked to current local workspace
+  const { data: task } = useTask(selectedWorkspace?.task_id);
+  const projectId = task?.project_id ?? null;
+
   const linkedRemoteWorkspace = useMemo(() => {
     if (!selectedWorkspace?.id) return null;
     return (
@@ -76,6 +79,7 @@ export function NavbarContainer() {
       null
     );
   }, [workspaces, selectedWorkspace?.id]);
+  const issueId = linkedRemoteWorkspace?.issue_id ?? null;
 
   const { data: orgsData } = useUserOrganizations();
   const selectedOrgId = useOrganizationStore((s) => s.selectedOrgId);
@@ -130,11 +134,8 @@ export function NavbarContainer() {
       leftItems={leftItems}
       rightItems={rightItems}
       leftSlot={
-        linkedRemoteWorkspace ? (
-          <ProjectBreadcrumb
-            projectId={linkedRemoteWorkspace.project_id}
-            issueId={linkedRemoteWorkspace.issue_id}
-          />
+        projectId ? (
+          <ProjectBreadcrumb projectId={projectId} issueId={issueId} />
         ) : null
       }
       actionContext={actionCtx}
