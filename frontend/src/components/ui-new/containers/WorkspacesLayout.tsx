@@ -164,7 +164,7 @@ export function WorkspacesLayout() {
                     <button
                       type="button"
                       onClick={handleCloseRightMainPanel}
-                      className="absolute top-1 left-1 z-10 p-half rounded-sm text-low hover:text-normal hover:bg-panel transition-colors"
+                      className="absolute top-1 right-1 z-10 p-half rounded-sm text-low hover:text-normal hover:bg-panel transition-colors"
                       aria-label="Close panel"
                       title="Close panel"
                     >
