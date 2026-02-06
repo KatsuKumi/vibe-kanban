@@ -17,6 +17,7 @@ import { ChangesPanelContainer } from '@/components/ui-new/containers/ChangesPan
 import { CreateChatBoxContainer } from '@/components/ui-new/containers/CreateChatBoxContainer';
 import { PreviewBrowserContainer } from '@/components/ui-new/containers/PreviewBrowserContainer';
 import { WorkspacesGuideDialog } from '@/components/ui-new/dialogs/WorkspacesGuideDialog';
+import { XIcon } from '@phosphor-icons/react';
 import { useUserSystem } from '@/components/ConfigProvider';
 
 import {
@@ -55,9 +56,14 @@ export function WorkspacesLayout() {
     isLeftMainPanelVisible,
     isRightSidebarVisible,
     rightMainPanelMode,
+    setRightMainPanelMode,
     setLeftSidebarVisible,
     setLeftMainPanelVisible,
   } = useWorkspacePanelState(isCreateMode ? undefined : workspaceId);
+
+  const handleCloseRightMainPanel = useCallback(() => {
+    setRightMainPanelMode(null);
+  }, [setRightMainPanelMode]);
 
   const {
     config,
@@ -154,23 +160,34 @@ export function WorkspacesLayout() {
                   minSize="20%"
                   className="min-w-0 h-full overflow-hidden"
                 >
-                  {rightMainPanelMode === RIGHT_MAIN_PANEL_MODES.CHANGES &&
-                    selectedWorkspace?.id && (
-                      <ChangesPanelContainer
-                        className=""
-                        attemptId={selectedWorkspace.id}
-                      />
+                  <div className="relative h-full">
+                    <button
+                      type="button"
+                      onClick={handleCloseRightMainPanel}
+                      className="absolute top-1 left-1 z-10 p-half rounded-sm text-low hover:text-normal hover:bg-panel transition-colors"
+                      aria-label="Close panel"
+                      title="Close panel"
+                    >
+                      <XIcon className="size-icon-sm" weight="bold" />
+                    </button>
+                    {rightMainPanelMode === RIGHT_MAIN_PANEL_MODES.CHANGES &&
+                      selectedWorkspace?.id && (
+                        <ChangesPanelContainer
+                          className=""
+                          attemptId={selectedWorkspace.id}
+                        />
+                      )}
+                    {rightMainPanelMode === RIGHT_MAIN_PANEL_MODES.LOGS && (
+                      <LogsContentContainer className="" />
                     )}
-                  {rightMainPanelMode === RIGHT_MAIN_PANEL_MODES.LOGS && (
-                    <LogsContentContainer className="" />
-                  )}
-                  {rightMainPanelMode === RIGHT_MAIN_PANEL_MODES.PREVIEW &&
-                    selectedWorkspace?.id && (
-                      <PreviewBrowserContainer
-                        attemptId={selectedWorkspace.id}
-                        className=""
-                      />
-                    )}
+                    {rightMainPanelMode === RIGHT_MAIN_PANEL_MODES.PREVIEW &&
+                      selectedWorkspace?.id && (
+                        <PreviewBrowserContainer
+                          attemptId={selectedWorkspace.id}
+                          className=""
+                        />
+                      )}
+                  </div>
                 </Panel>
               )}
             </Group>
