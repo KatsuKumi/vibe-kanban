@@ -26,6 +26,12 @@
           "agent_teams": true,
           "dangerously_skip_permissions": true
         }
+      },
+      "THINKING": {
+        "CLAUDE_CODE": {
+          "thinking_budget": 10000,
+          "dangerously_skip_permissions": true
+        }
       }
     },
     "AMP": {

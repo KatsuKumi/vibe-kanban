@@ -26,8 +26,8 @@ use workspace_utils::{
 
 use self::{
     client::{AUTO_APPROVE_CALLBACK_ID, ClaudeAgentClient, STOP_GIT_CHECK_CALLBACK_ID},
-    protocol::ProtocolPeer,
-    types::{ControlRequestType, ControlResponseType, PermissionMode},
+    protocol::{ProtocolMode, ProtocolPeer},
+    types::{BridgeConfig, ControlRequestType, ControlResponseType, PermissionMode},
 };
 use crate::{
     approvals::ExecutorApprovalService,
@@ -49,7 +49,20 @@ use crate::{
     stdout_dup::create_stdout_pipe_writer,
 };
 
-fn base_command(claude_code_router: bool) -> &'static str {
+const BRIDGE_SCRIPT_NAME: &str = "claude-agent-bridge.mjs";
+
+fn bridge_script_path() -> PathBuf {
+    if let Ok(override_path) = std::env::var("VK_CLAUDE_BRIDGE_PATH") {
+        return PathBuf::from(override_path);
+    }
+
+    let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    path.push("bridge");
+    path.push(BRIDGE_SCRIPT_NAME);
+    path
+}
+
+fn base_command_cli(claude_code_router: bool) -> &'static str {
     if claude_code_router {
         "npx -y @musistudio/claude-code-router@1.0.66 code"
     } else {
@@ -82,6 +95,8 @@ pub struct ClaudeCode {
         description = "Enable Claude Agent Teams to allow multiple Claude Code instances to coordinate and work together on tasks"
     )]
     pub agent_teams: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub thinking_budget: Option<u32>,
     #[serde(flatten)]
     pub cmd: CmdOverrides,
 
@@ -92,8 +107,16 @@ pub struct ClaudeCode {
 }
 
 impl ClaudeCode {
-    async fn build_command_builder(&self) -> Result<CommandBuilder, CommandBuildError> {
-        // If base_command_override is provided and claude_code_router is also set, log a warning
+    fn use_bridge(&self) -> bool {
+        self.cmd.base_command_override.is_none() && !self.claude_code_router.unwrap_or(false)
+    }
+
+    fn build_bridge_command(&self) -> CommandBuilder {
+        let script = bridge_script_path();
+        CommandBuilder::new(format!("node {}", script.display()))
+    }
+
+    async fn build_command_builder_cli(&self) -> Result<CommandBuilder, CommandBuildError> {
         if self.cmd.base_command_override.is_some() && self.claude_code_router.is_some() {
             tracing::warn!(
                 "base_command_override is set, this will override the claude_code_router setting"
@@ -101,7 +124,7 @@ impl ClaudeCode {
         }
 
         let mut builder =
-            CommandBuilder::new(base_command(self.claude_code_router.unwrap_or(false)))
+            CommandBuilder::new(base_command_cli(self.claude_code_router.unwrap_or(false)))
                 .params(["-p"]);
 
         let plan = self.plan.unwrap_or(false);
@@ -110,7 +133,6 @@ impl ClaudeCode {
             tracing::warn!("Both plan and approvals are enabled. Plan will take precedence.");
         }
         if plan || approvals {
-            // Enable bypass at startup, otherwise we cannot change to it after exiting plan mode
             builder = builder.extend_params(["--permission-prompt-tool=stdio"]);
             builder = builder.extend_params([format!(
                 "--permission-mode={}",
@@ -200,10 +222,15 @@ impl StandardCodingAgentExecutor for ClaudeCode {
         prompt: &str,
         env: &ExecutionEnv,
     ) -> Result<SpawnedChild, ExecutorError> {
-        let command_builder = self.build_command_builder().await?;
-        let command_parts = command_builder.build_initial()?;
-        self.spawn_internal(current_dir, prompt, command_parts, env)
-            .await
+        if self.use_bridge() {
+            self.spawn_bridge(current_dir, prompt, None, None, env)
+                .await
+        } else {
+            let command_builder = self.build_command_builder_cli().await?;
+            let command_parts = command_builder.build_initial()?;
+            self.spawn_internal_cli(current_dir, prompt, command_parts, env)
+                .await
+        }
     }
 
     async fn spawn_follow_up(
@@ -214,20 +241,29 @@ impl StandardCodingAgentExecutor for ClaudeCode {
         reset_to_message_id: Option<&str>,
         env: &ExecutionEnv,
     ) -> Result<SpawnedChild, ExecutorError> {
-        let command_builder = self.build_command_builder().await?;
-
-        let mut args = vec!["--resume".to_string(), session_id.to_string()];
-
-        // --resume-session-at truncates Claude's conversation history to the specified
-        // message and continues from there.
-        if let Some(uuid) = reset_to_message_id {
-            args.push("--resume-session-at".to_string());
-            args.push(uuid.to_string());
-        }
-
-        let command_parts = command_builder.build_follow_up(&args)?;
-        self.spawn_internal(current_dir, prompt, command_parts, env)
+        if self.use_bridge() {
+            self.spawn_bridge(
+                current_dir,
+                prompt,
+                Some(session_id),
+                reset_to_message_id,
+                env,
+            )
             .await
+        } else {
+            let command_builder = self.build_command_builder_cli().await?;
+
+            let mut args = vec!["--resume".to_string(), session_id.to_string()];
+
+            if let Some(uuid) = reset_to_message_id {
+                args.push("--resume-session-at".to_string());
+                args.push(uuid.to_string());
+            }
+
+            let command_parts = command_builder.build_follow_up(&args)?;
+            self.spawn_internal_cli(current_dir, prompt, command_parts, env)
+                .await
+        }
     }
 
     fn normalize_logs(&self, msg_store: Arc<MsgStore>, current_dir: &Path) {
@@ -297,7 +333,101 @@ impl StandardCodingAgentExecutor for ClaudeCode {
 }
 
 impl ClaudeCode {
-    async fn spawn_internal(
+    async fn spawn_bridge(
+        &self,
+        current_dir: &Path,
+        prompt: &str,
+        resume_session_id: Option<&str>,
+        resume_at_message_id: Option<&str>,
+        env: &ExecutionEnv,
+    ) -> Result<SpawnedChild, ExecutorError> {
+        let command_builder = self.build_bridge_command();
+        let command_parts = command_builder.build_initial()?;
+        let (program_path, args) = command_parts.into_resolved().await?;
+        let combined_prompt = self.append_prompt.combine_prompt(prompt);
+
+        let mut command = Command::new(program_path);
+        command
+            .kill_on_drop(true)
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .current_dir(current_dir)
+            .args(&args);
+
+        env.clone()
+            .with_profile(&self.cmd)
+            .apply_to_command(&mut command);
+
+        if self.disable_api_key.unwrap_or(false) {
+            command.env_remove("ANTHROPIC_API_KEY");
+            tracing::info!("ANTHROPIC_API_KEY removed from environment");
+        }
+
+        let mut child = command.group_spawn()?;
+        let child_stdout = child.inner().stdout.take().ok_or_else(|| {
+            ExecutorError::Io(std::io::Error::other("Claude Code missing stdout"))
+        })?;
+        let child_stdin = child.inner().stdin.take().ok_or_else(|| {
+            ExecutorError::Io(std::io::Error::other("Claude Code missing stdin"))
+        })?;
+
+        let new_stdout = create_stdout_pipe_writer(&mut child)?;
+        let cancel = CancellationToken::new();
+
+        let bridge_config = BridgeConfig {
+            prompt: combined_prompt,
+            cwd: current_dir.to_string_lossy().to_string(),
+            permission_mode: self.permission_mode(),
+            model: self.model.clone(),
+            disallowed_tools: vec!["AskUserQuestion".to_string()],
+            include_partial_messages: true,
+            dangerously_skip_permissions: self.dangerously_skip_permissions.unwrap_or(false),
+            max_thinking_tokens: self.thinking_budget,
+            hooks: self.get_hooks(env.commit_reminder),
+            resume: resume_session_id.map(String::from),
+            resume_at: resume_at_message_id.map(String::from),
+            env: self.cmd.env.clone(),
+            path_to_claude_code_executable: None,
+        };
+
+        let approvals_clone = self.approvals_service.clone();
+        let repo_context = env.repo_context.clone();
+        let commit_reminder_prompt = env.commit_reminder_prompt.clone();
+        let cancel_for_task = cancel.clone();
+        tokio::spawn(async move {
+            let log_writer = LogWriter::new(new_stdout);
+            let client = ClaudeAgentClient::new(
+                log_writer.clone(),
+                approvals_clone,
+                repo_context,
+                commit_reminder_prompt,
+                cancel_for_task.clone(),
+            );
+            let protocol_peer = ProtocolPeer::spawn(
+                child_stdin,
+                child_stdout,
+                client.clone(),
+                cancel_for_task,
+                ProtocolMode::Bridge,
+            );
+
+            if let Err(e) = protocol_peer.initialize_bridge(bridge_config).await {
+                tracing::error!("Failed to send bridge init: {e}");
+                let _ = log_writer
+                    .log_raw(&format!("Error: Failed to initialize bridge - {e}"))
+                    .await;
+            }
+        });
+
+        Ok(SpawnedChild {
+            child,
+            exit_signal: None,
+            cancel: Some(cancel),
+        })
+    }
+
+    async fn spawn_internal_cli(
         &self,
         current_dir: &Path,
         prompt: &str,
@@ -321,7 +451,6 @@ impl ClaudeCode {
             .with_profile(&self.cmd)
             .apply_to_command(&mut command);
 
-        // Remove ANTHROPIC_API_KEY if disable_api_key is enabled
         if self.disable_api_key.unwrap_or(false) {
             command.env_remove("ANTHROPIC_API_KEY");
             tracing::info!("ANTHROPIC_API_KEY removed from environment");
@@ -335,23 +464,21 @@ impl ClaudeCode {
         let child_stdout = child.inner().stdout.take().ok_or_else(|| {
             ExecutorError::Io(std::io::Error::other("Claude Code missing stdout"))
         })?;
-        let child_stdin =
-            child.inner().stdin.take().ok_or_else(|| {
-                ExecutorError::Io(std::io::Error::other("Claude Code missing stdin"))
-            })?;
+        let child_stdin = child.inner().stdin.take().ok_or_else(|| {
+            ExecutorError::Io(std::io::Error::other("Claude Code missing stdin"))
+        })?;
 
         let new_stdout = create_stdout_pipe_writer(&mut child)?;
         let permission_mode = self.permission_mode();
         let hooks = self.get_hooks(env.commit_reminder);
 
-        // Create cancellation token for graceful shutdown
         let cancel = CancellationToken::new();
 
-        // Spawn task to handle the SDK client with control protocol
         let prompt_clone = combined_prompt.clone();
         let approvals_clone = self.approvals_service.clone();
         let repo_context = env.repo_context.clone();
         let commit_reminder_prompt = env.commit_reminder_prompt.clone();
+        let thinking_budget = self.thinking_budget;
         let cancel_for_task = cancel.clone();
         tokio::spawn(async move {
             let log_writer = LogWriter::new(new_stdout);
@@ -362,11 +489,15 @@ impl ClaudeCode {
                 commit_reminder_prompt,
                 cancel_for_task.clone(),
             );
-            let protocol_peer =
-                ProtocolPeer::spawn(child_stdin, child_stdout, client.clone(), cancel_for_task);
+            let protocol_peer = ProtocolPeer::spawn(
+                child_stdin,
+                child_stdout,
+                client.clone(),
+                cancel_for_task,
+                ProtocolMode::Cli,
+            );
 
-            // Initialize control protocol
-            if let Err(e) = protocol_peer.initialize(hooks).await {
+            if let Err(e) = protocol_peer.initialize_legacy(hooks).await {
                 tracing::error!("Failed to initialize control protocol: {e}");
                 let _ = log_writer
                     .log_raw(&format!("Error: Failed to initialize - {e}"))
@@ -378,7 +509,12 @@ impl ClaudeCode {
                 tracing::warn!("Failed to set permission mode to {permission_mode}: {e}");
             }
 
-            // Send user message
+            if let Some(budget) = thinking_budget {
+                if let Err(e) = protocol_peer.set_max_thinking_tokens(budget).await {
+                    tracing::warn!("Failed to set max thinking tokens to {budget}: {e}");
+                }
+            }
+
             if let Err(e) = protocol_peer.send_user_message(prompt_clone).await {
                 tracing::error!("Failed to send prompt: {e}");
                 let _ = log_writer
@@ -2389,6 +2525,7 @@ mod tests {
             approvals_service: None,
             disable_api_key: None,
             agent_teams: None,
+            thinking_budget: None,
         };
         let msg_store = Arc::new(MsgStore::new());
         let current_dir = std::path::PathBuf::from("/tmp/test-worktree");

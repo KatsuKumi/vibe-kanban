@@ -2,6 +2,8 @@
 //!
 //! Similar to: https://github.com/ZhangHanDong/claude-code-api-rs/blob/main/claude-code-sdk-rs/src/types.rs
 
+use std::collections::HashMap;
+
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
@@ -194,6 +196,9 @@ pub enum SDKControlRequestType {
     SetPermissionMode {
         mode: PermissionMode,
     },
+    SetMaxThinkingTokens {
+        max_thinking_tokens: u32,
+    },
     Initialize {
         #[serde(skip_serializing_if = "Option::is_none")]
         hooks: Option<Value>,
@@ -225,4 +230,39 @@ impl std::fmt::Display for PermissionMode {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.as_str())
     }
+}
+
+#[derive(Debug, Serialize)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum BridgeCommand {
+    Init { config: BridgeConfig },
+    Interrupt {},
+    SetPermissionMode { mode: PermissionMode },
+    SetMaxThinkingTokens { max_thinking_tokens: u32 },
+    PermissionResponse { request_id: String, result: Value },
+    HookResponse { request_id: String, output: Value },
+}
+
+#[derive(Debug, Serialize)]
+pub struct BridgeConfig {
+    pub prompt: String,
+    pub cwd: String,
+    pub permission_mode: PermissionMode,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub model: Option<String>,
+    pub disallowed_tools: Vec<String>,
+    pub include_partial_messages: bool,
+    pub dangerously_skip_permissions: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub max_thinking_tokens: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub hooks: Option<Value>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub resume: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub resume_at: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub env: Option<HashMap<String, String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub path_to_claude_code_executable: Option<String>,
 }

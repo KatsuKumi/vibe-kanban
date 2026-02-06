@@ -7,22 +7,25 @@ use tokio::{
 };
 use tokio_util::sync::CancellationToken;
 
-use super::types::{CLIMessage, ControlRequestType, ControlResponseMessage, ControlResponseType};
+use super::types::{
+    BridgeCommand, BridgeConfig, CLIMessage, ControlRequestType, ControlResponseMessage,
+    ControlResponseType, Message, PermissionMode, SDKControlRequest, SDKControlRequestType,
+};
 use crate::{
     approvals::ExecutorApprovalError,
-    executors::{
-        ExecutorError,
-        claude::{
-            client::ClaudeAgentClient,
-            types::{Message, PermissionMode, SDKControlRequest, SDKControlRequestType},
-        },
-    },
+    executors::{ExecutorError, claude::client::ClaudeAgentClient},
 };
 
-/// Handles bidirectional control protocol communication
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub enum ProtocolMode {
+    Bridge,
+    Cli,
+}
+
 #[derive(Clone)]
 pub struct ProtocolPeer {
     stdin: Arc<Mutex<ChildStdin>>,
+    mode: ProtocolMode,
 }
 
 impl ProtocolPeer {
@@ -31,9 +34,11 @@ impl ProtocolPeer {
         stdout: ChildStdout,
         client: Arc<ClaudeAgentClient>,
         cancel: CancellationToken,
+        mode: ProtocolMode,
     ) -> Self {
         let peer = Self {
             stdin: Arc::new(Mutex::new(stdin)),
+            mode,
         };
 
         let reader_peer = peer.clone();
@@ -66,11 +71,10 @@ impl ProtocolPeer {
                     if let Err(e) = self.interrupt().await {
                         tracing::warn!("Failed to send interrupt to Claude: {e}");
                     }
-                    // Continue the loop to read Claude's response (it should send a result)
                 }
                 line_result = reader.read_line(&mut buffer) => {
                     match line_result {
-                        Ok(0) => break, // EOF
+                        Ok(0) => break,
                         Ok(_) => {
                             let line = buffer.trim();
                             if line.is_empty() {
@@ -78,7 +82,6 @@ impl ProtocolPeer {
                             }
                             client.log_message(line).await?;
 
-                            // Parse and handle control messages
                             match serde_json::from_str::<CLIMessage>(line) {
                                 Ok(CLIMessage::ControlRequest {
                                     request_id,
@@ -123,15 +126,14 @@ impl ProtocolPeer {
                     .await
                 {
                     Ok(result) => {
-                        if let Err(e) = self
-                            .send_hook_response(request_id, serde_json::to_value(result).unwrap())
-                            .await
-                        {
+                        let value = serde_json::to_value(result).unwrap();
+                        if let Err(e) = self.send_response(request_id, value).await {
                             tracing::error!("Failed to send permission result: {e}");
                         }
                     }
-                    Err(ExecutorError::ExecutorApprovalError(ExecutorApprovalError::Cancelled)) => {
-                    }
+                    Err(ExecutorError::ExecutorApprovalError(
+                        ExecutorApprovalError::Cancelled,
+                    )) => {}
                     Err(e) => {
                         tracing::error!("Error in on_can_use_tool: {e}");
                         if let Err(e2) = self.send_error(request_id, e.to_string()).await {
@@ -165,25 +167,66 @@ impl ProtocolPeer {
         }
     }
 
+    async fn send_response(
+        &self,
+        request_id: String,
+        result: serde_json::Value,
+    ) -> Result<(), ExecutorError> {
+        match self.mode {
+            ProtocolMode::Bridge => {
+                self.send_json(&BridgeCommand::PermissionResponse { request_id, result })
+                    .await
+            }
+            ProtocolMode::Cli => {
+                self.send_json(&ControlResponseMessage::new(ControlResponseType::Success {
+                    request_id,
+                    response: Some(result),
+                }))
+                .await
+            }
+        }
+    }
+
     pub async fn send_hook_response(
         &self,
         request_id: String,
         hook_output: serde_json::Value,
     ) -> Result<(), ExecutorError> {
-        self.send_json(&ControlResponseMessage::new(ControlResponseType::Success {
-            request_id,
-            response: Some(hook_output),
-        }))
-        .await
+        match self.mode {
+            ProtocolMode::Bridge => {
+                self.send_json(&BridgeCommand::HookResponse {
+                    request_id,
+                    output: hook_output,
+                })
+                .await
+            }
+            ProtocolMode::Cli => {
+                self.send_json(&ControlResponseMessage::new(ControlResponseType::Success {
+                    request_id,
+                    response: Some(hook_output),
+                }))
+                .await
+            }
+        }
     }
 
-    /// Send error response to CLI
     async fn send_error(&self, request_id: String, error: String) -> Result<(), ExecutorError> {
-        self.send_json(&ControlResponseMessage::new(ControlResponseType::Error {
-            request_id,
-            error: Some(error),
-        }))
-        .await
+        match self.mode {
+            ProtocolMode::Bridge => {
+                self.send_json(&BridgeCommand::HookResponse {
+                    request_id,
+                    output: serde_json::json!({ "error": error }),
+                })
+                .await
+            }
+            ProtocolMode::Cli => {
+                self.send_json(&ControlResponseMessage::new(ControlResponseType::Error {
+                    request_id,
+                    error: Some(error),
+                }))
+                .await
+            }
+        }
     }
 
     async fn send_json<T: serde::Serialize>(&self, message: &T) -> Result<(), ExecutorError> {
@@ -195,26 +238,66 @@ impl ProtocolPeer {
         Ok(())
     }
 
-    pub async fn send_user_message(&self, content: String) -> Result<(), ExecutorError> {
-        let message = Message::new_user(content);
-        self.send_json(&message).await
+    pub async fn initialize_bridge(&self, config: BridgeConfig) -> Result<(), ExecutorError> {
+        self.send_json(&BridgeCommand::Init { config }).await
     }
 
-    pub async fn initialize(&self, hooks: Option<serde_json::Value>) -> Result<(), ExecutorError> {
+    pub async fn initialize_legacy(
+        &self,
+        hooks: Option<serde_json::Value>,
+    ) -> Result<(), ExecutorError> {
         self.send_json(&SDKControlRequest::new(SDKControlRequestType::Initialize {
             hooks,
         }))
         .await
     }
+
+    pub async fn send_user_message(&self, content: String) -> Result<(), ExecutorError> {
+        self.send_json(&Message::new_user(content)).await
+    }
+
     pub async fn interrupt(&self) -> Result<(), ExecutorError> {
-        self.send_json(&SDKControlRequest::new(SDKControlRequestType::Interrupt {}))
-            .await
+        match self.mode {
+            ProtocolMode::Bridge => self.send_json(&BridgeCommand::Interrupt {}).await,
+            ProtocolMode::Cli => {
+                self.send_json(&SDKControlRequest::new(SDKControlRequestType::Interrupt {}))
+                    .await
+            }
+        }
     }
 
     pub async fn set_permission_mode(&self, mode: PermissionMode) -> Result<(), ExecutorError> {
-        self.send_json(&SDKControlRequest::new(
-            SDKControlRequestType::SetPermissionMode { mode },
-        ))
-        .await
+        match self.mode {
+            ProtocolMode::Bridge => {
+                self.send_json(&BridgeCommand::SetPermissionMode { mode })
+                    .await
+            }
+            ProtocolMode::Cli => {
+                self.send_json(&SDKControlRequest::new(
+                    SDKControlRequestType::SetPermissionMode { mode },
+                ))
+                .await
+            }
+        }
+    }
+
+    pub async fn set_max_thinking_tokens(
+        &self,
+        max_thinking_tokens: u32,
+    ) -> Result<(), ExecutorError> {
+        match self.mode {
+            ProtocolMode::Bridge => {
+                self.send_json(&BridgeCommand::SetMaxThinkingTokens { max_thinking_tokens })
+                    .await
+            }
+            ProtocolMode::Cli => {
+                self.send_json(&SDKControlRequest::new(
+                    SDKControlRequestType::SetMaxThinkingTokens {
+                        max_thinking_tokens,
+                    },
+                ))
+                .await
+            }
+        }
     }
 }

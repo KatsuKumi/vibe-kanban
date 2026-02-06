@@ -13,7 +13,7 @@ use tokio::{
 };
 use walkdir::WalkDir;
 
-use super::{ClaudeCode, ClaudeJson, ClaudePlugin, base_command};
+use super::{ClaudeCode, ClaudeJson, ClaudePlugin, base_command_cli};
 use crate::{
     command::{CommandBuildError, CommandBuilder, apply_overrides},
     env::{ExecutionEnv, RepoContext},
@@ -180,7 +180,7 @@ impl ClaudeCode {
         &self,
     ) -> Result<CommandBuilder, CommandBuildError> {
         let mut builder =
-            CommandBuilder::new(base_command(self.claude_code_router.unwrap_or(false)))
+            CommandBuilder::new(base_command_cli(self.claude_code_router.unwrap_or(false)))
                 .params(["-p"]);
 
         builder = builder.extend_params([
