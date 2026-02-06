@@ -26,8 +26,6 @@ export function ProjectBreadcrumb({
 
   const issue = issueId ? issues.find((i) => i.id === issueId) : null;
 
-  if (!project) return null;
-
   return (
     <div className="flex items-center gap-half text-sm text-low">
       <Link
@@ -35,7 +33,9 @@ export function ProjectBreadcrumb({
         className="flex items-center gap-half px-half hover:text-normal hover:bg-secondary rounded-sm transition-colors"
       >
         <LayoutIcon className="size-icon-xs" weight="bold" />
-        <span className="truncate max-w-[120px]">{project.name}</span>
+        {project && (
+          <span className="truncate max-w-[120px]">{project.name}</span>
+        )}
       </Link>
       {issueId && !issuesLoading && issue && (
         <>
