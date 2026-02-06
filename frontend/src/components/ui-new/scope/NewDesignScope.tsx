@@ -1,5 +1,6 @@
-import { ReactNode, useState, useRef, useEffect } from 'react';
+import { ReactNode, useState, useRef, useEffect, useMemo } from 'react';
 import { usePostHog } from 'posthog-js/react';
+import { useUserSystem } from '@/components/ConfigProvider';
 import { PortalContainerContext } from '@/contexts/PortalContainerContext';
 import {
   WorkspaceProvider,
@@ -48,10 +49,14 @@ function KeyboardShortcutsHandler() {
   return null;
 }
 
+const CUSTOM_FONT_LINK_ID = 'vk-custom-font';
+
 export function NewDesignScope({ children }: NewDesignScopeProps) {
   const [container, setContainer] = useState<HTMLElement | null>(null);
   const posthog = usePostHog();
   const hasTracked = useRef(false);
+  const { config } = useUserSystem();
+  const fontFamily = config?.font_family ?? null;
 
   useEffect(() => {
     if (!hasTracked.current) {
@@ -60,8 +65,42 @@ export function NewDesignScope({ children }: NewDesignScopeProps) {
     }
   }, [posthog]);
 
+  useEffect(() => {
+    const existing = document.getElementById(CUSTOM_FONT_LINK_ID);
+
+    if (!fontFamily) {
+      existing?.remove();
+      return;
+    }
+
+    const encoded = encodeURIComponent(fontFamily);
+    const href = `https://fonts.googleapis.com/css2?family=${encoded}:wght@400;500;600;700&display=swap`;
+
+    if (existing instanceof HTMLLinkElement) {
+      existing.href = href;
+    } else {
+      const link = document.createElement('link');
+      link.id = CUSTOM_FONT_LINK_ID;
+      link.rel = 'stylesheet';
+      link.href = href;
+      document.head.appendChild(link);
+    }
+
+    return () => {
+      document.getElementById(CUSTOM_FONT_LINK_ID)?.remove();
+    };
+  }, [fontFamily]);
+
+  const fontStyle = useMemo(
+    () =>
+      fontFamily
+        ? { fontFamily: `"${fontFamily}", "Noto Emoji", sans-serif` }
+        : undefined,
+    [fontFamily]
+  );
+
   return (
-    <div ref={setContainer} className="new-design h-full">
+    <div ref={setContainer} className="new-design h-full" style={fontStyle}>
       {container && (
         <PortalContainerContext.Provider value={container}>
           <WorkspaceProvider>

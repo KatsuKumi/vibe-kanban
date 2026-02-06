@@ -41,6 +41,7 @@ import {
   SettingsInput,
   SettingsSaveBar,
   SettingsSelect,
+  SettingsSlider,
   SettingsTextarea,
 } from './SettingsComponents';
 import { useSettingsDirty } from './SettingsDirtyContext';
@@ -65,7 +66,20 @@ export function GeneralSettingsSection() {
   const [branchPrefixError, setBranchPrefixError] = useState<string | null>(
     null
   );
+  const [customFontMode, setCustomFontMode] = useState(false);
   const { setTheme } = useTheme();
+
+  const FONT_OPTIONS = [
+    { value: '', label: 'IBM Plex Sans (Default)' },
+    { value: 'Inter', label: 'Inter' },
+    { value: 'Roboto', label: 'Roboto' },
+    { value: 'Fira Sans', label: 'Fira Sans' },
+    { value: 'Source Sans 3', label: 'Source Sans 3' },
+    { value: 'Open Sans', label: 'Open Sans' },
+    { value: 'JetBrains Mono', label: 'JetBrains Mono' },
+    { value: 'Fira Code', label: 'Fira Code' },
+    { value: '__custom__', label: 'Custom...' },
+  ];
 
   // Executor options for the default coding agent dropdown
   const executorOptions = profiles
@@ -157,6 +171,7 @@ export function GeneralSettingsSection() {
 
   const playSound = async (soundFile: SoundFile) => {
     const audio = new Audio(`/api/sounds/${soundFile}`);
+    audio.volume = draft?.notifications.sound_volume ?? 1.0;
     try {
       await audio.play();
     } catch (err) {
@@ -280,6 +295,49 @@ export function GeneralSettingsSection() {
             onChange={(value: UiLanguage) => updateDraft({ language: value })}
             placeholder={t('settings.general.appearance.language.placeholder')}
           />
+        </SettingsField>
+
+        <SettingsField
+          label={t('settings.general.appearance.font.label')}
+          description={t('settings.general.appearance.font.helper')}
+        >
+          <SettingsSelect
+            value={
+              customFontMode ||
+              (draft?.font_family &&
+                !FONT_OPTIONS.some(
+                  (o) => o.value === draft.font_family && o.value !== '__custom__'
+                ))
+                ? '__custom__'
+                : draft?.font_family ?? ''
+            }
+            options={FONT_OPTIONS}
+            onChange={(value: string) => {
+              if (value === '__custom__') {
+                setCustomFontMode(true);
+              } else {
+                setCustomFontMode(false);
+                updateDraft({ font_family: value || null });
+              }
+            }}
+            placeholder={t('settings.general.appearance.font.placeholder')}
+          />
+          {(customFontMode ||
+            (draft?.font_family &&
+              !FONT_OPTIONS.some(
+                (o) =>
+                  o.value === draft.font_family && o.value !== '__custom__'
+              ))) && (
+            <SettingsInput
+              value={draft?.font_family ?? ''}
+              onChange={(value) =>
+                updateDraft({ font_family: value || null })
+              }
+              placeholder={t(
+                'settings.general.appearance.font.customPlaceholder'
+              )}
+            />
+          )}
         </SettingsField>
       </SettingsCard>
 
@@ -691,6 +749,31 @@ export function GeneralSettingsSection() {
             <p className="text-sm text-low">
               {t('settings.general.notifications.sound.fileHelper')}
             </p>
+            <div className="space-y-2 pt-2">
+              <label className="text-sm font-medium text-normal">
+                {t('settings.general.notifications.volume.label')}
+              </label>
+              <SettingsSlider
+                value={Math.round(
+                  (draft.notifications.sound_volume ?? 1) * 100
+                )}
+                onChange={(value) =>
+                  updateDraft({
+                    notifications: {
+                      ...draft.notifications,
+                      sound_volume: value / 100,
+                    },
+                  })
+                }
+                min={0}
+                max={100}
+                step={1}
+                formatValue={(v) => `${v}%`}
+              />
+              <p className="text-sm text-low">
+                {t('settings.general.notifications.volume.helper')}
+              </p>
+            </div>
           </div>
         )}
 

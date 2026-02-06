@@ -62,6 +62,8 @@ pub struct Config {
     pub commit_reminder_prompt: Option<String>,
     #[serde(default)]
     pub send_message_shortcut: SendMessageShortcut,
+    #[serde(default)]
+    pub font_family: Option<String>,
 }
 
 impl Config {
@@ -92,6 +94,7 @@ impl Config {
             commit_reminder_enabled: true,
             commit_reminder_prompt: None,
             send_message_shortcut: SendMessageShortcut::default(),
+            font_family: None,
         }
     }
 
@@ -147,6 +150,7 @@ impl Default for Config {
             commit_reminder_enabled: true,
             commit_reminder_prompt: None,
             send_message_shortcut: SendMessageShortcut::default(),
+            font_family: None,
         }
     }
 }

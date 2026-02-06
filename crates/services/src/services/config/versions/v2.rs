@@ -151,11 +151,17 @@ impl From<v1::GitHubConfig> for GitHubConfig {
     }
 }
 
+fn default_sound_volume() -> f64 {
+    1.0
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
 pub struct NotificationConfig {
     pub sound_enabled: bool,
     pub push_enabled: bool,
     pub sound_file: SoundFile,
+    #[serde(default = "default_sound_volume")]
+    pub sound_volume: f64,
 }
 
 impl From<v1::Config> for NotificationConfig {
@@ -163,7 +169,8 @@ impl From<v1::Config> for NotificationConfig {
         Self {
             sound_enabled: old.sound_alerts,
             push_enabled: old.push_notifications,
-            sound_file: SoundFile::from(old.sound_file), // Now SCREAMING_SNAKE_CASE
+            sound_file: SoundFile::from(old.sound_file),
+            sound_volume: 1.0,
         }
     }
 }
@@ -174,6 +181,7 @@ impl Default for NotificationConfig {
             sound_enabled: true,
             push_enabled: true,
             sound_file: SoundFile::CowMooing,
+            sound_volume: 1.0,
         }
     }
 }

@@ -343,6 +343,49 @@ export function SettingsTextarea({
   );
 }
 
+export function SettingsSlider({
+  value,
+  onChange,
+  min = 0,
+  max = 100,
+  step = 1,
+  formatValue,
+  disabled,
+}: {
+  value: number;
+  onChange: (value: number) => void;
+  min?: number;
+  max?: number;
+  step?: number;
+  formatValue?: (value: number) => string;
+  disabled?: boolean;
+}) {
+  const displayValue = formatValue ? formatValue(value) : String(value);
+
+  return (
+    <div className="flex items-center gap-3">
+      <input
+        type="range"
+        value={value}
+        onChange={(e) => onChange(parseFloat(e.target.value))}
+        min={min}
+        max={max}
+        step={step}
+        disabled={disabled}
+        className={cn(
+          'flex-1 h-1.5 bg-secondary rounded-sm appearance-none cursor-pointer',
+          'accent-brand',
+          'focus:outline-none focus:ring-1 focus:ring-brand',
+          disabled && 'opacity-50 cursor-not-allowed'
+        )}
+      />
+      <span className="text-sm text-low w-10 text-right shrink-0">
+        {displayValue}
+      </span>
+    </div>
+  );
+}
+
 // SettingsSaveBar - A sticky save bar for unsaved changes
 export function SettingsSaveBar({
   show,

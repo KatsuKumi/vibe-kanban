@@ -28,7 +28,7 @@ impl NotificationService {
     /// Internal method to send notifications with a given config
     async fn send_notification(config: &NotificationConfig, title: &str, message: &str) {
         if config.sound_enabled {
-            Self::play_sound_notification(&config.sound_file).await;
+            Self::play_sound_notification(&config.sound_file, config.sound_volume).await;
         }
 
         if config.push_enabled {
@@ -37,7 +37,9 @@ impl NotificationService {
     }
 
     /// Play a system sound notification across platforms
-    async fn play_sound_notification(sound_file: &SoundFile) {
+    async fn play_sound_notification(sound_file: &SoundFile, volume: f64) {
+        let volume = volume.clamp(0.0, 1.0);
+
         let file_path = match sound_file.get_path().await {
             Ok(path) => path,
             Err(e) => {
@@ -46,35 +48,32 @@ impl NotificationService {
             }
         };
 
-        // Use platform-specific sound notification
-        // Note: spawn() calls are intentionally not awaited - sound notifications should be fire-and-forget
         if cfg!(target_os = "macos") {
             let _ = tokio::process::Command::new("afplay")
+                .arg("-v")
+                .arg(volume.to_string())
                 .arg(&file_path)
                 .spawn();
         } else if cfg!(target_os = "linux") && !utils::is_wsl2() {
-            // Try different Linux audio players
+            let pa_volume = (volume * 65536.0) as u32;
             if tokio::process::Command::new("paplay")
+                .arg(format!("--volume={pa_volume}"))
                 .arg(&file_path)
                 .spawn()
                 .is_ok()
             {
-                // Success with paplay
             } else if tokio::process::Command::new("aplay")
                 .arg(&file_path)
                 .spawn()
                 .is_ok()
             {
-                // Success with aplay
             } else {
-                // Try system bell as fallback
                 let _ = tokio::process::Command::new("echo")
                     .arg("-e")
                     .arg("\\a")
                     .spawn();
             }
         } else if cfg!(target_os = "windows") || (cfg!(target_os = "linux") && utils::is_wsl2()) {
-            // Convert WSL path to Windows path if in WSL2
             let file_path = if utils::is_wsl2() {
                 if let Some(windows_path) = Self::wsl_to_windows_path(&file_path).await {
                     windows_path
@@ -88,7 +87,7 @@ impl NotificationService {
             let _ = tokio::process::Command::new("powershell.exe")
                 .arg("-c")
                 .arg(format!(
-                    r#"(New-Object Media.SoundPlayer "{file_path}").PlaySync()"#
+                    r#"Add-Type -AssemblyName PresentationCore; $p = New-Object System.Windows.Media.MediaPlayer; $p.Open([Uri]"{file_path}"); $p.Volume = {volume}; $p.Play(); Start-Sleep -Seconds 3; $p.Close()"#
                 ))
                 .spawn();
         }

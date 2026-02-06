@@ -50,6 +50,12 @@
           "label": "Language",
           "placeholder": "Select language",
           "helper": "Choose your preferred language. Browser Default follows your system language."
+        },
+        "font": {
+          "label": "Font Family",
+          "placeholder": "Select font",
+          "helper": "Choose the font used throughout the application.",
+          "customPlaceholder": "Enter a font name (e.g., Helvetica, Arial)"
         }
       },
       "taskExecution": {
@@ -189,6 +195,10 @@
           "fileLabel": "Sound",
           "filePlaceholder": "Select sound",
           "fileHelper": "Choose the sound to play when tasks complete. Click the volume button to preview."
+        },
+        "volume": {
+          "label": "Volume",
+          "helper": "Adjust the notification sound volume."
         },
         "push": {
           "label": "Push Notifications",
