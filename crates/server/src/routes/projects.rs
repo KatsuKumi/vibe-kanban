@@ -85,7 +85,7 @@ pub async fn create_project(
     Json(payload): Json<CreateProject>,
 ) -> Result<ResponseJson<ApiResponse<Project>>, ApiError> {
     tracing::debug!("Creating project '{}'", payload.name);
-    let repo_count = payload.repositories.len();
+    let _repo_count = payload.repositories.len();
 
     match deployment
         .project()

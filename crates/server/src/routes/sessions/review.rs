@@ -100,7 +100,7 @@ pub async fn start_review(
     };
 
     let prompt = build_review_prompt(context.as_deref(), payload.additional_prompt.as_deref());
-    let resumed_session = agent_session_id.is_some();
+    let _resumed_session = agent_session_id.is_some();
 
     let action = ExecutorAction::new(
         ExecutorActionType::ReviewRequest(ReviewAction {

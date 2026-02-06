@@ -1405,7 +1405,7 @@ pub async fn run_setup_script(
         .await?
         .ok_or(SqlxError::RowNotFound)?;
 
-    let project = task
+    let _project = task
         .parent_project(pool)
         .await?
         .ok_or(SqlxError::RowNotFound)?;
@@ -1473,7 +1473,7 @@ pub async fn run_cleanup_script(
         .await?
         .ok_or(SqlxError::RowNotFound)?;
 
-    let project = task
+    let _project = task
         .parent_project(pool)
         .await?
         .ok_or(SqlxError::RowNotFound)?;
@@ -1538,7 +1538,7 @@ pub async fn run_archive_script(
         .await?
         .ok_or(SqlxError::RowNotFound)?;
 
-    let project = task
+    let _project = task
         .parent_project(pool)
         .await?
         .ok_or(SqlxError::RowNotFound)?;
