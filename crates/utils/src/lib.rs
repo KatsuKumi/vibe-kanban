@@ -14,7 +14,6 @@ pub mod path;
 pub mod port_file;
 pub mod process;
 pub mod response;
-pub mod sentry;
 pub mod shell;
 pub mod stream_lines;
 pub mod text;

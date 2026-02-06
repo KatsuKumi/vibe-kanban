@@ -6,12 +6,7 @@ use sqlx::Error as SqlxError;
 use strip_ansi_escapes::strip;
 use thiserror::Error;
 use tracing_subscriber::{EnvFilter, prelude::*};
-use utils::{
-    assets::asset_dir,
-    browser::open_browser,
-    port_file::write_port_file,
-    sentry::{self as sentry_utils, SentrySource, sentry_layer},
-};
+use utils::{assets::asset_dir, browser::open_browser, port_file::write_port_file};
 
 #[derive(Debug, Error)]
 pub enum VibeKanbanError {
@@ -32,8 +27,6 @@ async fn main() -> Result<(), VibeKanbanError> {
         .install_default()
         .expect("Failed to install rustls crypto provider");
 
-    sentry_utils::init_once(SentrySource::Backend);
-
     let log_level = std::env::var("RUST_LOG").unwrap_or_else(|_| "info".to_string());
     let filter_string = format!(
         "warn,server={level},services={level},db={level},executors={level},deployment={level},local_deployment={level},utils={level}",
@@ -42,7 +35,6 @@ async fn main() -> Result<(), VibeKanbanError> {
     let env_filter = EnvFilter::try_new(filter_string).expect("Failed to create tracing filter");
     tracing_subscriber::registry()
         .with(tracing_subscriber::fmt::layer().with_filter(env_filter))
-        .with(sentry_layer())
         .init();
 
     // Create asset directory if it doesn't exist
@@ -51,7 +43,6 @@ async fn main() -> Result<(), VibeKanbanError> {
     }
 
     let deployment = DeploymentImpl::new().await?;
-    deployment.update_sentry_scope().await?;
     deployment
         .container()
         .cleanup_orphan_executions()
@@ -67,9 +58,6 @@ async fn main() -> Result<(), VibeKanbanError> {
         .backfill_repo_names()
         .await
         .map_err(DeploymentError::from)?;
-    deployment
-        .track_if_analytics_allowed("session_start", serde_json::json!({}))
-        .await;
     // Pre-warm file search cache for most active projects
     let deployment_for_cache = deployment.clone();
     tokio::spawn(async move {

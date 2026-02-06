@@ -13,7 +13,6 @@ pub(super) struct Config {
     pub(super) push_notifications: bool,
     pub(super) editor: EditorConfig,
     pub(super) github: GitHubConfig,
-    pub(super) analytics_enabled: Option<bool>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

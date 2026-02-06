@@ -6,7 +6,6 @@ use tracing::instrument;
 
 use crate::{
     AppState,
-    analytics::{AnalyticsConfig, AnalyticsService},
     auth::{
         GitHubOAuthProvider, GoogleOAuthProvider, JwtService, OAuthHandoffService,
         OAuthTokenValidator, ProviderRegistry,
@@ -132,19 +131,6 @@ impl Server {
             tracing::info!("Billing provider not configured");
         }
 
-        let analytics = match AnalyticsConfig::from_env() {
-            Some(analytics_config) => {
-                tracing::info!("PostHog analytics configured");
-                Some(AnalyticsService::new(analytics_config))
-            }
-            None => {
-                tracing::info!(
-                    "PostHog analytics not configured (POSTHOG_API_KEY and/or POSTHOG_API_ENDPOINT not set)"
-                );
-                None
-            }
-        };
-
         let state = AppState::new(
             pool.clone(),
             config.clone(),
@@ -157,7 +143,6 @@ impl Server {
             r2,
             github_app,
             billing,
-            analytics,
         );
 
         let router = routes::router(state);

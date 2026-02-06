@@ -44,7 +44,6 @@ import {
   ArrowUpIcon,
   HighlighterIcon,
   ListIcon,
-  MegaphoneIcon,
   QuestionIcon,
   ArrowsLeftRightIcon,
   ArrowFatLineUpIcon,
@@ -71,7 +70,6 @@ import { CreatePRDialog } from '@/components/dialogs/tasks/CreatePRDialog';
 import { getIdeName } from '@/components/ide/IdeIcon';
 import { EditorSelectionDialog } from '@/components/dialogs/tasks/EditorSelectionDialog';
 import { StartReviewDialog } from '@/components/dialogs/tasks/StartReviewDialog';
-import posthog from 'posthog-js';
 import { WorkspacesGuideDialog } from '@/components/ui-new/dialogs/WorkspacesGuideDialog';
 import { SettingsDialog } from '@/components/ui-new/dialogs/SettingsDialog';
 import { CreateWorkspaceFromPrDialog } from '@/components/dialogs/CreateWorkspaceFromPrDialog';
@@ -566,16 +564,6 @@ export const Actions = {
       ctx.navigate('/workspaces');
     },
   } satisfies GlobalActionDefinition,
-
-  Feedback: {
-    id: 'feedback',
-    label: 'Give Feedback',
-    icon: MegaphoneIcon,
-    requiresTarget: ActionTargetType.NONE,
-    execute: () => {
-      posthog.displaySurvey('019bb6e8-3d36-0000-1806-7330cd3c727e');
-    },
-  },
 
   WorkspacesGuide: {
     id: 'workspaces-guide',
@@ -1445,7 +1433,6 @@ export const NavbarActionGroups = {
     Actions.ToggleRightSidebar,
     NavbarDivider,
     Actions.OpenCommandBar,
-    Actions.Feedback,
     Actions.WorkspacesGuide,
     Actions.Settings,
   ] as NavbarItem[],

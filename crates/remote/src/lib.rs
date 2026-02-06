@@ -1,4 +1,3 @@
-mod analytics;
 mod app;
 mod auth;
 mod billing;
@@ -26,7 +25,6 @@ use tracing_subscriber::{
     layer::{Layer as _, SubscriberExt},
     util::SubscriberInitExt,
 };
-pub use utils::sentry::{init_once as sentry_init_once, SentrySource};
 
 pub fn init_tracing() {
     if tracing::dispatcher::has_been_set() {
@@ -44,10 +42,5 @@ pub fn init_tracing() {
         .with(tracing_subscriber::EnvFilter::new(env_filter))
         .with(ErrorLayer::default())
         .with(fmt_layer)
-        .with(utils::sentry::sentry_layer())
         .init();
-}
-
-pub fn configure_user_scope(user_id: uuid::Uuid, username: Option<&str>, email: Option<&str>) {
-    utils::sentry::configure_user_scope(&user_id.to_string(), username, email);
 }

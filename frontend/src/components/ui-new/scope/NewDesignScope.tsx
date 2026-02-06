@@ -1,5 +1,4 @@
-import { ReactNode, useState, useRef, useEffect, useMemo } from 'react';
-import { usePostHog } from 'posthog-js/react';
+import { ReactNode, useState, useEffect, useMemo } from 'react';
 import { useUserSystem } from '@/components/ConfigProvider';
 import { PortalContainerContext } from '@/contexts/PortalContainerContext';
 import {
@@ -53,17 +52,8 @@ const CUSTOM_FONT_LINK_ID = 'vk-custom-font';
 
 export function NewDesignScope({ children }: NewDesignScopeProps) {
   const [container, setContainer] = useState<HTMLElement | null>(null);
-  const posthog = usePostHog();
-  const hasTracked = useRef(false);
   const { config } = useUserSystem();
   const fontFamily = config?.font_family ?? null;
-
-  useEffect(() => {
-    if (!hasTracked.current) {
-      posthog?.capture('ui_new_accessed');
-      hasTracked.current = true;
-    }
-  }, [posthog]);
 
   useEffect(() => {
     const existing = document.getElementById(CUSTOM_FONT_LINK_ID);

@@ -7,7 +7,6 @@ import { ProjectTasks } from '@/pages/ProjectTasks';
 import { FullAttemptLogsPage } from '@/pages/FullAttemptLogs';
 import { NormalLayout } from '@/components/layout/NormalLayout';
 import { SharedAppLayout } from '@/components/ui-new/containers/SharedAppLayout';
-import { usePostHog } from 'posthog-js/react';
 import { useAuth } from '@/hooks';
 import { usePreviousPath } from '@/hooks/usePreviousPath';
 import { useUiPreferencesScratch } from '@/hooks/useUiPreferencesScratch';
@@ -29,8 +28,6 @@ import { HotkeysProvider } from 'react-hotkeys-hook';
 
 import { ProjectProvider } from '@/contexts/ProjectContext';
 import { ThemeMode } from 'shared/types';
-import * as Sentry from '@sentry/react';
-
 import { DisclaimerDialog } from '@/components/dialogs/global/DisclaimerDialog';
 import { OnboardingDialog } from '@/components/dialogs/global/OnboardingDialog';
 import { ReleaseNotesDialog } from '@/components/dialogs/global/ReleaseNotesDialog';
@@ -49,11 +46,8 @@ import { WorkspacesLanding } from '@/pages/ui-new/WorkspacesLanding';
 import { ElectricTestPage } from '@/pages/ui-new/ElectricTestPage';
 import { ProjectKanban } from '@/pages/ui-new/ProjectKanban';
 
-const SentryRoutes = Sentry.withSentryReactRouterV6Routing(Routes);
-
 function AppContent() {
-  const { config, analyticsUserId, updateAndSaveConfig } = useUserSystem();
-  const posthog = usePostHog();
+  const { config, updateAndSaveConfig } = useUserSystem();
   const { isSignedIn } = useAuth();
 
   // Track previous path for back navigation
@@ -61,20 +55,6 @@ function AppContent() {
 
   // Sync UI preferences with server scratch storage
   useUiPreferencesScratch();
-
-  // Handle opt-in/opt-out and user identification when config loads
-  useEffect(() => {
-    if (!posthog || !analyticsUserId) return;
-
-    if (config?.analytics_enabled) {
-      posthog.opt_in_capturing();
-      posthog.identify(analyticsUserId);
-      console.log('[Analytics] Analytics enabled and user identified');
-    } else {
-      posthog.opt_out_capturing();
-      console.log('[Analytics] Analytics disabled by user preference');
-    }
-  }, [config?.analytics_enabled, analyticsUserId, posthog]);
 
   useEffect(() => {
     if (!config) return;
@@ -136,7 +116,7 @@ function AppContent() {
     <I18nextProvider i18n={i18n}>
       <ThemeProvider initialTheme={config?.theme || ThemeMode.SYSTEM}>
         <SearchProvider>
-          <SentryRoutes>
+          <Routes>
             {/* ========== LEGACY DESIGN ROUTES ========== */}
             {/* VS Code full-page logs route (outside NormalLayout for minimal UI) */}
             <Route
@@ -228,7 +208,7 @@ function AppContent() {
               />
 
             </Route>
-          </SentryRoutes>
+          </Routes>
         </SearchProvider>
       </ThemeProvider>
     </I18nextProvider>

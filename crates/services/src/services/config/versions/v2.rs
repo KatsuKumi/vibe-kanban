@@ -47,7 +47,6 @@ pub struct Config {
     pub notifications: NotificationConfig,
     pub editor: EditorConfig,
     pub github: GitHubConfig,
-    pub analytics_enabled: Option<bool>,
     pub workspace_dir: Option<String>,
 }
 
@@ -91,7 +90,6 @@ impl Config {
             notifications: NotificationConfig::from(old_config_clone),
             editor: EditorConfig::from(old_config.editor),
             github: GitHubConfig::from(old_config.github),
-            analytics_enabled: None,
             workspace_dir: None,
         })
     }
@@ -124,7 +122,6 @@ impl Default for Config {
             notifications: NotificationConfig::default(),
             editor: EditorConfig::default(),
             github: GitHubConfig::default(),
-            analytics_enabled: None,
             workspace_dir: None,
         }
     }

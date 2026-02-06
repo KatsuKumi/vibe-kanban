@@ -6,7 +6,6 @@ import type { Project as RemoteProject } from 'shared/remote-types';
 import { AppBarButton } from './AppBarButton';
 import { AppBarUserPopoverContainer } from '../containers/AppBarUserPopoverContainer';
 import { Tooltip } from './Tooltip';
-import { useDiscordOnlineCount } from '@/hooks/useDiscordOnlineCount';
 
 function getProjectInitials(name: string): string {
   const trimmed = name.trim();
@@ -48,8 +47,6 @@ export function AppBar({
   isSignedIn,
   isLoadingProjects,
 }: AppBarProps) {
-  const { data: onlineCount } = useDiscordOnlineCount();
-
   return (
     <div
       className={cn(
@@ -151,11 +148,6 @@ export function AppBar({
             >
               <path d={siDiscord.path} />
             </svg>
-            {onlineCount != null && (
-              <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 flex items-center justify-center rounded-full bg-brand text-[10px] font-medium text-white">
-                {onlineCount > 999 ? '999+' : onlineCount}
-              </span>
-            )}
           </a>
         </Tooltip>
       </div>

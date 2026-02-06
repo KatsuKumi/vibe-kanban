@@ -6,7 +6,6 @@ use deployment::{Deployment, DeploymentError, RemoteClientNotConfigured};
 use executors::profile::ExecutorConfigs;
 use git::GitService;
 use services::services::{
-    analytics::{AnalyticsConfig, AnalyticsContext, AnalyticsService, generate_user_id},
     approvals::Approvals,
     auth::AuthContext,
     config::{Config, load_config_from_file, save_config_to_file},
@@ -40,9 +39,7 @@ pub mod pty;
 #[derive(Clone)]
 pub struct LocalDeployment {
     config: Arc<RwLock<Config>>,
-    user_id: String,
     db: DBService,
-    analytics: Option<AnalyticsService>,
     container: LocalContainerService,
     git: GitService,
     project: ProjectService,
@@ -98,8 +95,6 @@ impl Deployment for LocalDeployment {
         }
 
         let config = Arc::new(RwLock::new(raw_config));
-        let user_id = generate_user_id();
-        let analytics = AnalyticsConfig::new().map(AnalyticsService::new);
         let git = GitService::new();
         let project = ProjectService::new();
         let repo = RepoService::new();
@@ -165,19 +160,12 @@ impl Deployment for LocalDeployment {
 
         let oauth_handoffs = Arc::new(RwLock::new(HashMap::new()));
 
-        // We need to make analytics accessible to the ContainerService
-        // TODO: Handle this more gracefully
-        let analytics_ctx = analytics.as_ref().map(|s| AnalyticsContext {
-            user_id: user_id.clone(),
-            analytics_service: s.clone(),
-        });
         let container = LocalContainerService::new(
             db.clone(),
             msg_stores.clone(),
             config.clone(),
             git.clone(),
             image.clone(),
-            analytics_ctx,
             approvals.clone(),
             queued_message_service.clone(),
             remote_client.clone().ok(),
@@ -191,20 +179,14 @@ impl Deployment for LocalDeployment {
         let pty = PtyService::new();
         {
             let db = db.clone();
-            let analytics = analytics.as_ref().map(|s| AnalyticsContext {
-                user_id: user_id.clone(),
-                analytics_service: s.clone(),
-            });
             let container = container.clone();
             let rc = remote_client.clone().ok();
-            PrMonitorService::spawn(db, analytics, container, rc).await;
+            PrMonitorService::spawn(db, container, rc).await;
         }
 
         let deployment = Self {
             config,
-            user_id,
             db,
-            analytics,
             container,
             git,
             project,
@@ -224,20 +206,12 @@ impl Deployment for LocalDeployment {
         Ok(deployment)
     }
 
-    fn user_id(&self) -> &str {
-        &self.user_id
-    }
-
     fn config(&self) -> &Arc<RwLock<Config>> {
         &self.config
     }
 
     fn db(&self) -> &DBService {
         &self.db
-    }
-
-    fn analytics(&self) -> &Option<AnalyticsService> {
-        &self.analytics
     }
 
     fn container(&self) -> &impl ContainerService {

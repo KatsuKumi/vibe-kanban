@@ -123,18 +123,5 @@ pub async fn start_review(
         )
         .await?;
 
-    deployment
-        .track_if_analytics_allowed(
-            "review_started",
-            serde_json::json!({
-                "workspace_id": workspace.id.to_string(),
-                "session_id": session.id.to_string(),
-                "executor": payload.executor_profile_id.executor.to_string(),
-                "variant": payload.executor_profile_id.variant,
-                "resumed_session": resumed_session,
-            }),
-        )
-        .await;
-
     Ok(ResponseJson(ApiResponse::success(execution_process)))
 }
