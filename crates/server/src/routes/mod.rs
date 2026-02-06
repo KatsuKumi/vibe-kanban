@@ -2,6 +2,7 @@ use axum::{
     Router,
     routing::{IntoMakeService, get},
 };
+use tower_http::trace::TraceLayer;
 use tower_http::validate_request::ValidateRequestHeaderLayer;
 
 use crate::{DeploymentImpl, middleware};
@@ -55,6 +56,7 @@ pub fn router(deployment: DeploymentImpl) -> IntoMakeService<Router> {
         .layer(ValidateRequestHeaderLayer::custom(
             middleware::validate_origin,
         ))
+        .layer(TraceLayer::new_for_http())
         .with_state(deployment);
 
     Router::new()
