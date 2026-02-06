@@ -1,6 +1,7 @@
-use std::{path::Path, time::Duration};
+use std::time::Duration;
 
 use thiserror::Error;
+use tokio::io::AsyncWriteExt;
 use tokio::process::Command;
 
 const CLAUDE_CODE_PACKAGE: &str = "npx -y @anthropic-ai/claude-code@2.1.32";
@@ -53,8 +54,16 @@ pub async fn generate_commit_message(
 
     let base_args: Vec<&str> = CLAUDE_CODE_PACKAGE.split_whitespace().skip(1).collect();
 
-    let temp_dir = tempfile::TempDir::new()
-        .map_err(|e| CommitMessageError::ProcessFailed(format!("failed to create temp dir: {e}")))?;
+    let temp_dir = tempfile::TempDir::new().map_err(|e| {
+        CommitMessageError::ProcessFailed(format!("failed to create temp dir: {e}"))
+    })?;
+
+    let system_prompt_path = temp_dir.path().join("system_prompt.txt");
+    tokio::fs::write(&system_prompt_path, system_prompt)
+        .await
+        .map_err(|e| {
+            CommitMessageError::ProcessFailed(format!("failed to write system prompt file: {e}"))
+        })?;
 
     let mut cmd = Command::new(&npx_path);
     cmd.args(&base_args)
@@ -62,16 +71,24 @@ pub async fn generate_commit_message(
         .arg("--model")
         .arg("haiku")
         .arg("--no-session-persistence")
-        .arg("--system-prompt")
-        .arg(system_prompt)
-        .arg(&user_prompt)
+        .arg("--system-prompt-file")
+        .arg(&system_prompt_path)
         .current_dir(temp_dir.path())
         .env("NPM_CONFIG_LOGLEVEL", "error")
-        .stdin(std::process::Stdio::null())
+        .stdin(std::process::Stdio::piped())
         .stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::piped());
 
-    let output = tokio::time::timeout(Duration::from_secs(30), cmd.output())
+    let mut child = cmd
+        .spawn()
+        .map_err(|e| CommitMessageError::ProcessFailed(e.to_string()))?;
+
+    if let Some(mut stdin) = child.stdin.take() {
+        let _ = stdin.write_all(user_prompt.as_bytes()).await;
+        drop(stdin);
+    }
+
+    let output = tokio::time::timeout(Duration::from_secs(60), child.wait_with_output())
         .await
         .map_err(|_| CommitMessageError::Timeout)?
         .map_err(|e| CommitMessageError::ProcessFailed(e.to_string()))?;
