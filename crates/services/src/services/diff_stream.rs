@@ -25,7 +25,7 @@ use thiserror::Error;
 use tokio::{sync::mpsc, task::JoinHandle};
 use tokio_stream::wrappers::{IntervalStream, ReceiverStream};
 use utils::{
-    diff::{self, Diff},
+    diff::Diff,
     log_msg::LogMsg,
 };
 use uuid::Uuid;
@@ -486,17 +486,6 @@ pub fn apply_stream_omit_policy(diff: &mut Diff, sent_bytes: &Arc<AtomicUsize>, 
 }
 
 fn omit_diff_contents(diff: &mut Diff) {
-    if diff.additions.is_none()
-        && diff.deletions.is_none()
-        && (diff.old_content.is_some() || diff.new_content.is_some())
-    {
-        let old = diff.old_content.as_deref().unwrap_or("");
-        let new = diff.new_content.as_deref().unwrap_or("");
-        let (add, del) = diff::compute_line_change_counts(old, new);
-        diff.additions = Some(add);
-        diff.deletions = Some(del);
-    }
-
     diff.old_content = None;
     diff.new_content = None;
     diff.content_omitted = true;

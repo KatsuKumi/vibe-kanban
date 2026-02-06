@@ -1,6 +1,5 @@
 use std::borrow::Cow;
 
-use git2::{DiffOptions, Patch};
 use serde::{Deserialize, Serialize};
 use similar::TextDiff;
 use ts_rs::TS;
@@ -76,19 +75,17 @@ pub fn create_unified_diff(file_path: &str, old: &str, new: &str) -> String {
 pub fn compute_line_change_counts(old: &str, new: &str) -> (usize, usize) {
     let old = ensure_newline(old);
     let new = ensure_newline(new);
-
-    let mut opts = DiffOptions::new();
-    opts.context_lines(0);
-
-    match Patch::from_buffers(old.as_bytes(), None, new.as_bytes(), None, Some(&mut opts))
-        .and_then(|patch| patch.line_stats())
-    {
-        Ok((_, adds, dels)) => (adds, dels),
-        Err(e) => {
-            tracing::error!("git2 diff failed: {}", e);
-            (0, 0)
+    let diff = TextDiff::from_lines(old.as_ref(), new.as_ref());
+    let mut additions = 0usize;
+    let mut deletions = 0usize;
+    for change in diff.iter_all_changes() {
+        match change.tag() {
+            similar::ChangeTag::Insert => additions += 1,
+            similar::ChangeTag::Delete => deletions += 1,
+            similar::ChangeTag::Equal => {}
         }
     }
+    (additions, deletions)
 }
 
 // ensure a line ends with a newline character
