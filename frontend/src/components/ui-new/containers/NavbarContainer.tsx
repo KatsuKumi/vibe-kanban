@@ -1,7 +1,6 @@
 import { useMemo, useCallback } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useWorkspaceContext } from '@/contexts/WorkspaceContext';
-import { useUserContext } from '@/contexts/remote/UserContext';
 import { useActions } from '@/contexts/ActionsContext';
 import { useUserOrganizations } from '@/hooks/useUserOrganizations';
 import { useOrganizationStore } from '@/stores/useOrganizationStore';
@@ -65,21 +64,11 @@ function filterNavbarItems(
 export function NavbarContainer() {
   const { executeAction } = useActions();
   const { workspace: selectedWorkspace, isCreateMode } = useWorkspaceContext();
-  const { workspaces } = useUserContext();
   const location = useLocation();
   const isOnProjectPage = location.pathname.startsWith('/projects/');
 
   const { data: task } = useTask(selectedWorkspace?.task_id);
   const projectId = task?.project_id ?? null;
-
-  const linkedRemoteWorkspace = useMemo(() => {
-    if (!selectedWorkspace?.id) return null;
-    return (
-      workspaces.find((w) => w.local_workspace_id === selectedWorkspace.id) ??
-      null
-    );
-  }, [workspaces, selectedWorkspace?.id]);
-  const issueId = linkedRemoteWorkspace?.issue_id ?? null;
 
   const { data: orgsData } = useUserOrganizations();
   const selectedOrgId = useOrganizationStore((s) => s.selectedOrgId);
@@ -134,9 +123,7 @@ export function NavbarContainer() {
       leftItems={leftItems}
       rightItems={rightItems}
       leftSlot={
-        projectId ? (
-          <ProjectBreadcrumb projectId={projectId} issueId={issueId} />
-        ) : null
+        projectId ? <ProjectBreadcrumb projectId={projectId} /> : null
       }
       actionContext={actionCtx}
       onExecuteAction={handleExecuteAction}
