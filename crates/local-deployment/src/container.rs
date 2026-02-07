@@ -17,6 +17,7 @@ use db::{
             ExecutionContext, ExecutionProcess, ExecutionProcessRunReason, ExecutionProcessStatus,
         },
         execution_process_repo_state::ExecutionProcessRepoState,
+        log_buffer::LogBuffer,
         repo::Repo,
         scratch::{DraftFollowUpData, Scratch, ScratchType},
         session::{Session, SessionError},
@@ -65,11 +66,10 @@ use crate::{command, copy};
 #[derive(Clone)]
 pub struct LocalContainerService {
     db: DBService,
+    log_buffer: LogBuffer,
     child_store: Arc<RwLock<HashMap<Uuid, Arc<RwLock<AsyncGroupChild>>>>>,
     cancellation_tokens: Arc<RwLock<HashMap<Uuid, CancellationToken>>>,
     msg_stores: Arc<RwLock<HashMap<Uuid, Arc<MsgStore>>>>,
-    /// Tracks background tasks that stream logs to the database.
-    /// When stopping execution, we await these to ensure logs are fully persisted.
     db_stream_handles: Arc<RwLock<HashMap<Uuid, JoinHandle<()>>>>,
     exit_monitor_handles: Arc<RwLock<HashMap<Uuid, JoinHandle<()>>>>,
     config: Arc<RwLock<Config>>,
@@ -93,6 +93,7 @@ impl LocalContainerService {
         queued_message_service: QueuedMessageService,
         remote_client: Option<RemoteClient>,
     ) -> Self {
+        let log_buffer = LogBuffer::new(db.pool.clone());
         let child_store = Arc::new(RwLock::new(HashMap::new()));
         let cancellation_tokens = Arc::new(RwLock::new(HashMap::new()));
         let db_stream_handles = Arc::new(RwLock::new(HashMap::new()));
@@ -101,6 +102,7 @@ impl LocalContainerService {
 
         let container = LocalContainerService {
             db,
+            log_buffer,
             child_store,
             cancellation_tokens,
             msg_stores,
@@ -946,6 +948,10 @@ impl ContainerService for LocalContainerService {
 
     fn db(&self) -> &DBService {
         &self.db
+    }
+
+    fn log_buffer(&self) -> &LogBuffer {
+        &self.log_buffer
     }
 
     fn git(&self) -> &GitService {

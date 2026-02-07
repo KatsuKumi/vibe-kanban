@@ -18,6 +18,7 @@ use db::{
         execution_process_repo_state::{
             CreateExecutionProcessRepoState, ExecutionProcessRepoState,
         },
+        log_buffer::LogBuffer,
         repo::Repo,
         session::{CreateSession, Session, SessionError},
         task::{Task, TaskStatus},
@@ -89,6 +90,8 @@ pub trait ContainerService {
     fn msg_stores(&self) -> &Arc<RwLock<HashMap<Uuid, Arc<MsgStore>>>>;
 
     fn db(&self) -> &DBService;
+
+    fn log_buffer(&self) -> &LogBuffer;
 
     fn git(&self) -> &GitService;
 
@@ -984,9 +987,9 @@ pub trait ContainerService {
         let execution_id = *execution_id;
         let msg_stores = self.msg_stores().clone();
         let db = self.db().clone();
+        let log_buffer = self.log_buffer().clone();
 
         tokio::spawn(async move {
-            // Get the message store for this execution
             let store = {
                 let map = msg_stores.read().await;
                 map.get(&execution_id).cloned()
@@ -998,25 +1001,12 @@ pub trait ContainerService {
                 while let Some(Ok(msg)) = stream.next().await {
                     match &msg {
                         LogMsg::Stdout(_) | LogMsg::Stderr(_) => {
-                            // Serialize this individual message as a JSONL line
                             match serde_json::to_string(&msg) {
                                 Ok(jsonl_line) => {
                                     let jsonl_line_with_newline = format!("{jsonl_line}\n");
-
-                                    // Append this line to the database
-                                    if let Err(e) = ExecutionProcessLogs::append_log_line(
-                                        &db.pool,
-                                        execution_id,
-                                        &jsonl_line_with_newline,
-                                    )
-                                    .await
-                                    {
-                                        tracing::error!(
-                                            "Failed to append log line for execution {}: {}",
-                                            execution_id,
-                                            e
-                                        );
-                                    }
+                                    log_buffer
+                                        .append(execution_id, jsonl_line_with_newline)
+                                        .await;
                                 }
                                 Err(e) => {
                                     tracing::error!(
@@ -1028,7 +1018,6 @@ pub trait ContainerService {
                             }
                         }
                         LogMsg::SessionId(agent_session_id) => {
-                            // Append this line to the database
                             if let Err(e) = CodingAgentTurn::update_agent_session_id(
                                 &db.pool,
                                 execution_id,
@@ -1061,6 +1050,7 @@ pub trait ContainerService {
                             }
                         }
                         LogMsg::Finished => {
+                            log_buffer.flush_execution(execution_id).await;
                             break;
                         }
                         LogMsg::JsonPatch(_) | LogMsg::Ready => continue,
@@ -1271,18 +1261,13 @@ pub trait ContainerService {
             }
             Task::update_status(&self.db().pool, task.id, TaskStatus::InReview).await?;
 
-            // Emit stderr error message
             let log_message = LogMsg::Stderr(format!("Failed to start execution: {start_error}"));
             if let Ok(json_line) = serde_json::to_string(&log_message) {
-                let _ = ExecutionProcessLogs::append_log_line(
-                    &self.db().pool,
-                    execution_process.id,
-                    &format!("{json_line}\n"),
-                )
-                .await;
+                self.log_buffer()
+                    .append(execution_process.id, format!("{json_line}\n"))
+                    .await;
             }
 
-            // Emit NextAction with failure context for coding agent requests
             if let ContainerError::ExecutorError(ExecutorError::ExecutableNotFound { program }) =
                 &start_error
             {
@@ -1297,14 +1282,14 @@ pub trait ContainerService {
                 };
                 let patch = ConversationPatch::add_normalized_entry(2, error_message);
                 if let Ok(json_line) = serde_json::to_string::<LogMsg>(&LogMsg::JsonPatch(patch)) {
-                    let _ = ExecutionProcessLogs::append_log_line(
-                        &self.db().pool,
-                        execution_process.id,
-                        &format!("{json_line}\n"),
-                    )
-                    .await;
+                    self.log_buffer()
+                        .append(execution_process.id, format!("{json_line}\n"))
+                        .await;
                 }
             };
+            self.log_buffer()
+                .flush_execution(execution_process.id)
+                .await;
             return Err(start_error);
         }
 
