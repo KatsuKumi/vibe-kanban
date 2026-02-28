@@ -1,4 +1,5 @@
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 use tokio_util::sync::CancellationToken;
 use workspace_utils::approvals::ApprovalStatus;
@@ -30,7 +31,7 @@ const TOOL_DENY_PREFIX: &str = "The user doesn't want to proceed with this tool 
 pub struct ClaudeAgentClient {
     log_writer: LogWriter,
     approvals: Option<Arc<dyn ExecutorApprovalService>>,
-    auto_approve: bool, // true when approvals is None
+    auto_approve: AtomicBool,
     repo_context: RepoContext,
     commit_reminder_prompt: String,
     cancel: CancellationToken,
@@ -45,7 +46,7 @@ impl ClaudeAgentClient {
         commit_reminder_prompt: String,
         cancel: CancellationToken,
     ) -> Arc<Self> {
-        let auto_approve = approvals.is_none();
+        let auto_approve = AtomicBool::new(approvals.is_none());
         Arc::new(Self {
             log_writer,
             approvals,
@@ -138,7 +139,7 @@ impl ClaudeAgentClient {
         _permission_suggestions: Option<Vec<PermissionUpdate>>,
         tool_use_id: Option<String>,
     ) -> Result<PermissionResult, ExecutorError> {
-        if self.auto_approve {
+        if self.auto_approve.load(Ordering::Relaxed) {
             Ok(PermissionResult::Allow {
                 updated_input: input,
                 updated_permissions: None,
@@ -185,7 +186,7 @@ impl ClaudeAgentClient {
             });
         }
 
-        if self.auto_approve {
+        if self.auto_approve.load(Ordering::Relaxed) {
             Ok(serde_json::json!({
                 "hookSpecificOutput": {
                     "hookEventName": "PreToolUse",
@@ -235,16 +236,21 @@ impl ClaudeAgentClient {
                     };
 
                     match self
-                        .handle_approval(resolved_id, tool_name, tool_input)
+                        .handle_approval(resolved_id, tool_name.clone(), tool_input)
                         .await?
                     {
-                        PermissionResult::Allow { .. } => Ok(serde_json::json!({
-                            "hookSpecificOutput": {
-                                "hookEventName": "PreToolUse",
-                                "permissionDecision": "allow",
-                                "permissionDecisionReason": "Approved via approval service"
+                        PermissionResult::Allow { .. } => {
+                            if tool_name == EXIT_PLAN_MODE_NAME {
+                                self.auto_approve.store(true, Ordering::Relaxed);
                             }
-                        })),
+                            Ok(serde_json::json!({
+                                "hookSpecificOutput": {
+                                    "hookEventName": "PreToolUse",
+                                    "permissionDecision": "allow",
+                                    "permissionDecisionReason": "Approved via approval service"
+                                }
+                            }))
+                        }
                         PermissionResult::Deny { message, .. } => Ok(serde_json::json!({
                             "hookSpecificOutput": {
                                 "hookEventName": "PreToolUse",
