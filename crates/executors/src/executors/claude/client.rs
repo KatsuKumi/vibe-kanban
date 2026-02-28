@@ -164,9 +164,8 @@ impl ClaudeAgentClient {
         &self,
         callback_id: String,
         input: serde_json::Value,
-        _tool_use_id: Option<String>,
+        tool_use_id: Option<String>,
     ) -> Result<serde_json::Value, ExecutorError> {
-        // Stop hook git check - uses `decision` (approve/block) and `reason` fields
         if callback_id == STOP_GIT_CHECK_CALLBACK_ID {
             if input
                 .get("stop_hook_active")
@@ -204,16 +203,56 @@ impl ClaudeAgentClient {
                     }
                 })),
                 _ => {
-                    // Hook callbacks is only used to forward approval requests to can_use_tool.
-                    // This works because `ask` decision in hook callback triggers a can_use_tool request
-                    // https://docs.claude.com/en/api/agent-sdk/permissions#permission-flow-diagram
-                    Ok(serde_json::json!({
-                        "hookSpecificOutput": {
-                            "hookEventName": "PreToolUse",
-                            "permissionDecision": "ask",
-                            "permissionDecisionReason": "Forwarding to canusetool service"
-                        }
-                    }))
+                    let tool_name = input
+                        .get("tool_name")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("unknown")
+                        .to_string();
+                    let tool_input = input
+                        .get("tool_input")
+                        .cloned()
+                        .unwrap_or(serde_json::json!({}));
+                    let resolved_id = tool_use_id
+                        .or_else(|| {
+                            input
+                                .get("tool_use_id")
+                                .and_then(|v| v.as_str())
+                                .map(|s| s.to_string())
+                        });
+
+                    let Some(resolved_id) = resolved_id else {
+                        tracing::warn!(
+                            "No tool_use_id available for hook callback tool '{}', auto-approving",
+                            tool_name
+                        );
+                        return Ok(serde_json::json!({
+                            "hookSpecificOutput": {
+                                "hookEventName": "PreToolUse",
+                                "permissionDecision": "allow",
+                                "permissionDecisionReason": "No tool_use_id available, auto-approved"
+                            }
+                        }));
+                    };
+
+                    match self
+                        .handle_approval(resolved_id, tool_name, tool_input)
+                        .await?
+                    {
+                        PermissionResult::Allow { .. } => Ok(serde_json::json!({
+                            "hookSpecificOutput": {
+                                "hookEventName": "PreToolUse",
+                                "permissionDecision": "allow",
+                                "permissionDecisionReason": "Approved via approval service"
+                            }
+                        })),
+                        PermissionResult::Deny { message, .. } => Ok(serde_json::json!({
+                            "hookSpecificOutput": {
+                                "hookEventName": "PreToolUse",
+                                "permissionDecision": "deny",
+                                "permissionDecisionReason": message
+                            }
+                        })),
+                    }
                 }
             }
         }
