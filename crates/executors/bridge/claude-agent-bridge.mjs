@@ -9,10 +9,14 @@ function writeLine(obj) {
   process.stdout.write(JSON.stringify(obj) + "\n");
 }
 
-function buildCanUseTool(stdinRL) {
-  return async (toolName, input, { signal, suggestions }) => {
+function buildCanUseTool(stdinRL, needsFullPermissionChecks) {
+  return async (toolName, input, { signal, suggestions, toolUseID }) => {
     if (toolName === "AskUserQuestion") {
-      return handleAskUserQuestion(input, signal);
+      return handleAskUserQuestion(input, signal, toolUseID);
+    }
+
+    if (!needsFullPermissionChecks) {
+      return { behavior: "allow", updatedInput: input };
     }
 
     const requestId = randomUUID();
@@ -25,7 +29,7 @@ function buildCanUseTool(stdinRL) {
         tool_name: toolName,
         input,
         permission_suggestions: suggestions ?? null,
-        tool_use_id: null,
+        tool_use_id: toolUseID ?? null,
       },
     });
 
@@ -39,7 +43,7 @@ function buildCanUseTool(stdinRL) {
   };
 }
 
-function handleAskUserQuestion(input, signal) {
+function handleAskUserQuestion(input, signal, toolUseID) {
   const requestId = randomUUID();
 
   writeLine({
@@ -48,7 +52,7 @@ function handleAskUserQuestion(input, signal) {
     request: {
       subtype: "ask_user_question",
       input,
-      tool_use_id: null,
+      tool_use_id: toolUseID ?? null,
     },
   });
 
@@ -296,14 +300,13 @@ async function main() {
     options.env = { ...process.env, ...config.env };
   }
 
-  const needsCanUseTool =
-    config.permission_mode === "plan" ||
-    config.permission_mode === "default" ||
-    config.permission_mode === "acceptEdits";
+  const needsFullPermissionChecks =
+    !config.dangerously_skip_permissions &&
+    (config.permission_mode === "plan" ||
+      config.permission_mode === "default" ||
+      config.permission_mode === "acceptEdits");
 
-  if (needsCanUseTool && !config.dangerously_skip_permissions) {
-    options.canUseTool = buildCanUseTool(stdinRL);
-  }
+  options.canUseTool = buildCanUseTool(stdinRL, needsFullPermissionChecks);
 
   const translatedHooks = translateHooks(config.hooks);
   if (translatedHooks) {

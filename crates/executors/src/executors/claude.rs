@@ -198,7 +198,7 @@ impl ClaudeCode {
                 "PreToolUse".to_string(),
                 serde_json::json!([
                     {
-                        "matcher": "^(?!(Glob|Grep|NotebookRead|Read|Task|TodoWrite)$).*",
+                        "matcher": "^(?!(Glob|Grep|NotebookRead|Read|Task|TodoWrite|AskUserQuestion)$).*",
                         "hookCallbackIds": ["tool_approval"],
                     }
                 ]),
