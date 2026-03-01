@@ -11,6 +11,10 @@ function writeLine(obj) {
 
 function buildCanUseTool(stdinRL) {
   return async (toolName, input, { signal, suggestions }) => {
+    if (toolName === "AskUserQuestion") {
+      return handleAskUserQuestion(input, signal);
+    }
+
     const requestId = randomUUID();
 
     writeLine({
@@ -33,6 +37,39 @@ function buildCanUseTool(stdinRL) {
       });
     });
   };
+}
+
+function handleAskUserQuestion(input, signal) {
+  const requestId = randomUUID();
+
+  writeLine({
+    type: "control_request",
+    request_id: requestId,
+    request: {
+      subtype: "ask_user_question",
+      input,
+      tool_use_id: null,
+    },
+  });
+
+  return new Promise((resolve, reject) => {
+    pendingRequests.set(requestId, {
+      resolve: (answers) => {
+        resolve({
+          behavior: "allow",
+          updatedInput: {
+            ...input,
+            answers,
+          },
+        });
+      },
+      reject,
+    });
+    signal?.addEventListener("abort", () => {
+      pendingRequests.delete(requestId);
+      reject(new Error("Aborted"));
+    });
+  });
 }
 
 function buildHookCallback(callbackId) {
@@ -180,6 +217,15 @@ function handleStdinCommand(line) {
       if (pending) {
         pendingRequests.delete(cmd.request_id);
         pending.resolve(cmd.output);
+      }
+      break;
+    }
+
+    case "ask_user_question_response": {
+      const pending = pendingRequests.get(cmd.request_id);
+      if (pending) {
+        pendingRequests.delete(cmd.request_id);
+        pending.resolve(cmd.answers);
       }
       break;
     }

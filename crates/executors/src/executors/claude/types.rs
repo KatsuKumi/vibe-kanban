@@ -84,6 +84,11 @@ pub enum ControlRequestType {
         #[serde(skip_serializing_if = "Option::is_none")]
         tool_use_id: Option<String>,
     },
+    AskUserQuestion {
+        input: Value,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        tool_use_id: Option<String>,
+    },
 }
 
 /// Result of permission check
@@ -241,6 +246,7 @@ pub enum BridgeCommand {
     SetMaxThinkingTokens { max_thinking_tokens: u32 },
     PermissionResponse { request_id: String, result: Value },
     HookResponse { request_id: String, output: Value },
+    AskUserQuestionResponse { request_id: String, answers: Value },
 }
 
 #[derive(Debug, Serialize)]

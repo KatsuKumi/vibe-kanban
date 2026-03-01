@@ -97,7 +97,7 @@ impl ClaudeAgentClient {
             .await?;
 
         match status {
-            ApprovalStatus::Approved => {
+            ApprovalStatus::Approved | ApprovalStatus::Answered { .. } => {
                 if tool_name == EXIT_PLAN_MODE_NAME {
                     Ok(PermissionResult::Allow {
                         updated_input: tool_input,
@@ -261,6 +261,59 @@ impl ClaudeAgentClient {
                     }
                 }
             }
+        }
+    }
+
+    pub async fn on_ask_user_question(
+        &self,
+        _request_id: String,
+        input: serde_json::Value,
+        tool_use_id: Option<String>,
+    ) -> Result<serde_json::Value, ExecutorError> {
+        let tool_call_id = tool_use_id.unwrap_or_else(|| uuid::Uuid::new_v4().to_string());
+
+        let approval_service = self
+            .approvals
+            .as_ref()
+            .ok_or(ExecutorApprovalError::ServiceUnavailable)?;
+
+        let status = approval_service
+            .request_tool_approval("AskUserQuestion", input, &tool_call_id, self.cancel.clone())
+            .await
+            .map_err(|err| {
+                if !matches!(err, ExecutorApprovalError::Cancelled) {
+                    tracing::error!(
+                        "AskUserQuestion approval failed for call_id={}: {err}",
+                        tool_call_id
+                    );
+                };
+                err
+            })?;
+
+        self.log_writer
+            .log_raw(&serde_json::to_string(&ClaudeJson::ApprovalResponse {
+                call_id: tool_call_id,
+                tool_name: "AskUserQuestion".to_string(),
+                approval_status: status.clone(),
+            })?)
+            .await?;
+
+        match status {
+            ApprovalStatus::Answered { answers } => Ok(answers),
+            ApprovalStatus::Approved => Ok(serde_json::json!({})),
+            ApprovalStatus::Denied { reason } => Err(ExecutorError::ExecutorApprovalError(
+                ExecutorApprovalError::RequestFailed(
+                    reason.unwrap_or_else(|| "User declined to answer".to_string()),
+                ),
+            )),
+            ApprovalStatus::TimedOut => Err(ExecutorError::ExecutorApprovalError(
+                ExecutorApprovalError::RequestFailed("Question timed out".to_string()),
+            )),
+            ApprovalStatus::Pending => Err(ExecutorError::ExecutorApprovalError(
+                ExecutorApprovalError::RequestFailed(
+                    "Question finished in pending state".to_string(),
+                ),
+            )),
         }
     }
 

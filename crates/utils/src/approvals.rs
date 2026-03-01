@@ -49,6 +49,9 @@ pub enum ApprovalStatus {
         #[ts(optional)]
         reason: Option<String>,
     },
+    Answered {
+        answers: serde_json::Value,
+    },
     TimedOut,
 }
 

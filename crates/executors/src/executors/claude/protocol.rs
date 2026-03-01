@@ -164,6 +164,29 @@ impl ProtocolPeer {
                     }
                 }
             }
+            ControlRequestType::AskUserQuestion { input, tool_use_id } => {
+                match client
+                    .on_ask_user_question(request_id.clone(), input, tool_use_id)
+                    .await
+                {
+                    Ok(answers) => {
+                        if let Err(e) =
+                            self.send_ask_user_question_response(request_id, answers).await
+                        {
+                            tracing::error!("Failed to send ask_user_question response: {e}");
+                        }
+                    }
+                    Err(ExecutorError::ExecutorApprovalError(
+                        ExecutorApprovalError::Cancelled,
+                    )) => {}
+                    Err(e) => {
+                        tracing::error!("Error in on_ask_user_question: {e}");
+                        if let Err(e2) = self.send_error(request_id, e.to_string()).await {
+                            tracing::error!("Failed to send error response: {e2}");
+                        }
+                    }
+                }
+            }
         }
     }
 
@@ -204,6 +227,29 @@ impl ProtocolPeer {
                 self.send_json(&ControlResponseMessage::new(ControlResponseType::Success {
                     request_id,
                     response: Some(hook_output),
+                }))
+                .await
+            }
+        }
+    }
+
+    pub async fn send_ask_user_question_response(
+        &self,
+        request_id: String,
+        answers: serde_json::Value,
+    ) -> Result<(), ExecutorError> {
+        match self.mode {
+            ProtocolMode::Bridge => {
+                self.send_json(&BridgeCommand::AskUserQuestionResponse {
+                    request_id,
+                    answers,
+                })
+                .await
+            }
+            ProtocolMode::Cli => {
+                self.send_json(&ControlResponseMessage::new(ControlResponseType::Success {
+                    request_id,
+                    response: Some(answers),
                 }))
                 .await
             }

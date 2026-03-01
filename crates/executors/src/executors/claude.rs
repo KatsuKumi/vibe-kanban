@@ -151,7 +151,6 @@ impl ClaudeCode {
             "--input-format=stream-json",
             "--include-partial-messages",
             "--replay-user-messages",
-            "--disallowedTools=AskUserQuestion",
         ]);
 
         apply_overrides(builder, &self.cmd)
@@ -380,7 +379,7 @@ impl ClaudeCode {
             cwd: current_dir.to_string_lossy().to_string(),
             permission_mode: self.permission_mode(),
             model: self.model.clone(),
-            disallowed_tools: vec!["AskUserQuestion".to_string()],
+            disallowed_tools: vec![],
             include_partial_messages: true,
             dangerously_skip_permissions: self.dangerously_skip_permissions.unwrap_or(false),
             max_thinking_tokens: self.thinking_budget,
@@ -1548,8 +1547,9 @@ impl ClaudeLogProcessor {
             } => {
                 // Convert denials and timeouts to visible entries (matching Codex behavior)
                 let entry_opt = match approval_status {
-                    ApprovalStatus::Pending => None,
-                    ApprovalStatus::Approved => None,
+                    ApprovalStatus::Pending
+                    | ApprovalStatus::Approved
+                    | ApprovalStatus::Answered { .. } => None,
                     ApprovalStatus::Denied { reason } => Some(NormalizedEntry {
                         timestamp: None,
                         entry_type: NormalizedEntryType::UserFeedback {

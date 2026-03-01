@@ -94,11 +94,17 @@ impl Approvals {
             let matching_tool = find_matching_tool_use(store.clone(), &request.tool_call_id);
 
             if let Some((idx, matching_tool)) = matching_tool {
+                let include_input = request.tool_name == "AskUserQuestion";
                 let approval_entry = matching_tool
                     .with_tool_status(ToolStatus::PendingApproval {
                         approval_id: req_id.clone(),
                         requested_at: request.created_at,
                         timeout_at: request.timeout_at,
+                        tool_input: if include_input {
+                            Some(request.tool_input.clone())
+                        } else {
+                            None
+                        },
                     })
                     .ok_or(ApprovalError::NoToolUseEntry)?;
                 store.push_patch(ConversationPatch::replace(idx, approval_entry));
@@ -173,7 +179,9 @@ impl Approvals {
             // If approved or denied, and task is still InReview, move back to InProgress
             if matches!(
                 req.status,
-                ApprovalStatus::Approved | ApprovalStatus::Denied { .. }
+                ApprovalStatus::Approved
+                    | ApprovalStatus::Denied { .. }
+                    | ApprovalStatus::Answered { .. }
             ) && let Ok(ctx) =
                 ExecutionProcess::load_context(pool, tool_ctx.execution_process_id).await
                 && ctx.task.status == TaskStatus::InReview
@@ -431,6 +439,7 @@ mod tests {
                 approval_id: "test-id".to_string(),
                 requested_at: chrono::Utc::now(),
                 timeout_at: chrono::Utc::now(),
+                tool_input: None,
             },
         );
         store.push_patch(

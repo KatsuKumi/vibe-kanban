@@ -16,6 +16,7 @@ import {
   type PersistKey,
 } from '@/stores/useUiPreferencesStore';
 import DisplayConversationEntry from '@/components/NormalizedConversation/DisplayConversationEntry';
+import PendingQuestionEntry from '@/components/NormalizedConversation/PendingQuestionEntry';
 import { useMessageEditContext } from '@/contexts/MessageEditContext';
 import type { UseResetProcessResult } from '@/components/ui-new/hooks/useResetProcess';
 import { useChangesView } from '@/contexts/ChangesViewContext';
@@ -235,6 +236,16 @@ function renderToolUseEntry(
 
   // Generic tool pending approval - use plan-style card
   if (status.status === 'pending_approval') {
+    if (entryType.tool_name === 'AskUserQuestion' && status.tool_input) {
+      return (
+        <PendingQuestionEntry
+          pendingStatus={status}
+          executionProcessId={executionProcessId}
+        >
+          <div />
+        </PendingQuestionEntry>
+      );
+    }
     return (
       <GenericToolApprovalEntry
         toolName={entryType.tool_name}

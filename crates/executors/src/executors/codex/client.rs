@@ -349,7 +349,9 @@ impl AppServerClient {
         }
 
         let outcome = match status {
-            ApprovalStatus::Approved => (ReviewDecision::Approved, None),
+            ApprovalStatus::Approved | ApprovalStatus::Answered { .. } => {
+                (ReviewDecision::Approved, None)
+            }
             ApprovalStatus::Denied { reason } => {
                 let feedback = reason
                     .as_ref()

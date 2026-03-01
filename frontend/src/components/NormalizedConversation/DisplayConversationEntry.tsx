@@ -33,6 +33,7 @@ import {
 import RawLogText from '../common/RawLogText';
 import UserMessage from './UserMessage';
 import PendingApprovalEntry from './PendingApprovalEntry';
+import PendingQuestionEntry from './PendingQuestionEntry';
 import { NextActionCard } from './NextActionCard';
 import { cn } from '@/lib/utils';
 import { useRetryUi } from '@/contexts/RetryUiContext';
@@ -867,6 +868,16 @@ function DisplayConversationEntry({
     );
 
     if (isPendingApprovalStatus(status)) {
+      if (toolEntry.tool_name === 'AskUserQuestion' && status.tool_input) {
+        return (
+          <PendingQuestionEntry
+            pendingStatus={status}
+            executionProcessId={executionProcessId}
+          >
+            {content}
+          </PendingQuestionEntry>
+        );
+      }
       return (
         <PendingApprovalEntry
           pendingStatus={status}

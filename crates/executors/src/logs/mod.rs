@@ -150,6 +150,9 @@ pub enum ToolStatus {
         approval_id: String,
         requested_at: DateTime<Utc>,
         timeout_at: DateTime<Utc>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        #[ts(optional)]
+        tool_input: Option<serde_json::Value>,
     },
     TimedOut,
 }
@@ -157,12 +160,14 @@ pub enum ToolStatus {
 impl ToolStatus {
     pub fn from_approval_status(status: &ApprovalStatus) -> Option<Self> {
         match status {
-            ApprovalStatus::Approved => Some(ToolStatus::Created),
+            ApprovalStatus::Approved | ApprovalStatus::Answered { .. } => {
+                Some(ToolStatus::Created)
+            }
             ApprovalStatus::Denied { reason } => Some(ToolStatus::Denied {
                 reason: reason.clone(),
             }),
             ApprovalStatus::TimedOut => Some(ToolStatus::TimedOut),
-            ApprovalStatus::Pending => None, // this should not happen
+            ApprovalStatus::Pending => None,
         }
     }
 }

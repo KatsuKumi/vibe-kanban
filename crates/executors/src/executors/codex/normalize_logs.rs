@@ -1239,8 +1239,9 @@ impl ToNormalizedEntryOpt for Approval {
         let tool_name = self.display_tool_name();
 
         match approval_status {
-            ApprovalStatus::Pending => None,
-            ApprovalStatus::Approved => None,
+            ApprovalStatus::Pending | ApprovalStatus::Approved | ApprovalStatus::Answered { .. } => {
+                None
+            }
             ApprovalStatus::Denied { reason } => Some(NormalizedEntry {
                 timestamp: None,
                 entry_type: NormalizedEntryType::UserFeedback {
