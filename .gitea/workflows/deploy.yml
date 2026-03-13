@@ -33,5 +33,5 @@ jobs:
       - name: Restart service
         run: |
           sudo systemctl restart vibe-kanban
-          sleep 2
-          sudo systemctl is-active vibe-kanban
+          sleep 5
+          sudo systemctl is-active --quiet vibe-kanban && echo "Service is running" || (sudo systemctl status vibe-kanban --no-pager; exit 1)
