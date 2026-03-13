@@ -407,6 +407,7 @@ mod tests {
                 entry_type: NormalizedEntryType::SystemMessage,
                 content: content.to_string(),
                 metadata: None,
+                parent_tool_use_id: None,
             }
         };
 
@@ -436,6 +437,7 @@ mod tests {
                     },
                     content,
                     metadata: None,
+                    parent_tool_use_id: None,
                 }
             } else {
                 NormalizedEntry {
@@ -443,6 +445,7 @@ mod tests {
                     entry_type: NormalizedEntryType::SystemMessage,
                     content: content.to_string(),
                     metadata: None,
+                    parent_tool_use_id: None,
                 }
             }
         };
@@ -464,6 +467,7 @@ mod tests {
                 entry_type: NormalizedEntryType::SystemMessage,
                 content,
                 metadata: None,
+                parent_tool_use_id: None,
             }
         };
 

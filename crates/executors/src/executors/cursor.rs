@@ -169,6 +169,7 @@ impl StandardCodingAgentExecutor for CursorAgent {
                         },
                         content,
                         metadata: None,
+                        parent_tool_use_id: None,
                     }
                 }))
                 .time_gap(Duration::from_secs(2))
@@ -185,6 +186,7 @@ impl StandardCodingAgentExecutor for CursorAgent {
                         },
                         content: content.to_string(),
                         metadata: None,
+                        parent_tool_use_id: None,
                     };
                     let id = entry_index_provider_stderr.next();
                     msg_store_stderr
@@ -230,6 +232,7 @@ impl StandardCodingAgentExecutor for CursorAgent {
                                 entry_type: NormalizedEntryType::SystemMessage,
                                 content: line.to_string(),
                                 metadata: None,
+                                parent_tool_use_id: None,
                             };
 
                             let patch_id = entry_index_provider.next();
@@ -266,6 +269,7 @@ impl StandardCodingAgentExecutor for CursorAgent {
                                 entry_type: NormalizedEntryType::SystemMessage,
                                 content: format!("System initialized with model: {model}"),
                                 metadata: None,
+                                parent_tool_use_id: None,
                             };
                             let id = entry_index_provider.next();
                             msg_store
@@ -284,6 +288,7 @@ impl StandardCodingAgentExecutor for CursorAgent {
                                 entry_type: NormalizedEntryType::AssistantMessage,
                                 content: current_assistant_message_buffer.clone(),
                                 metadata: None,
+                                parent_tool_use_id: None,
                             };
                             if let Some(id) = current_assistant_message_index {
                                 msg_store.push_patch(ConversationPatch::replace(id, replace_entry))
@@ -307,6 +312,7 @@ impl StandardCodingAgentExecutor for CursorAgent {
                                 entry_type: NormalizedEntryType::Thinking,
                                 content: current_thinking_message_buffer.clone(),
                                 metadata: None,
+                                parent_tool_use_id: None,
                             };
                             if let Some(id) = current_thinking_message_index {
                                 msg_store.push_patch(ConversationPatch::replace(id, entry));
@@ -344,6 +350,7 @@ impl StandardCodingAgentExecutor for CursorAgent {
                                 },
                                 content,
                                 metadata: None,
+                                parent_tool_use_id: None,
                             };
                             let id = entry_index_provider.next();
                             if let Some(cid) = call_id.as_ref() {
@@ -465,6 +472,7 @@ impl StandardCodingAgentExecutor for CursorAgent {
                                 },
                                 content: content_str,
                                 metadata: None,
+                                parent_tool_use_id: None,
                             };
                             msg_store.push_patch(ConversationPatch::replace(idx, entry));
                         }
@@ -480,6 +488,7 @@ impl StandardCodingAgentExecutor for CursorAgent {
                             entry_type: NormalizedEntryType::SystemMessage,
                             content: line,
                             metadata: None,
+                            parent_tool_use_id: None,
                         };
                         let id = entry_index_provider.next();
                         msg_store.push_patch(ConversationPatch::add_normalized_entry(id, entry));

@@ -29,6 +29,7 @@ fn system_message(content: String) -> NormalizedEntry {
         entry_type: NormalizedEntryType::SystemMessage,
         content,
         metadata: None,
+        parent_tool_use_id: None,
     }
 }
 
@@ -86,6 +87,7 @@ pub fn normalize_logs(msg_store: Arc<MsgStore>, worktree_path: &Path) {
                                 total_tokens, model_context_window
                             ),
                             metadata: None,
+                            parent_tool_use_id: None,
                         },
                     );
                 }
@@ -98,6 +100,7 @@ pub fn normalize_logs(msg_store: Arc<MsgStore>, worktree_path: &Path) {
                             entry_type: NormalizedEntryType::AssistantMessage,
                             content: message,
                             metadata: None,
+                            parent_tool_use_id: None,
                         },
                     );
                 }
@@ -122,6 +125,7 @@ pub fn normalize_logs(msg_store: Arc<MsgStore>, worktree_path: &Path) {
                                 entry_type: NormalizedEntryType::SystemMessage,
                                 content,
                                 metadata: None,
+                                parent_tool_use_id: None,
                             },
                         ),
                     );
@@ -138,6 +142,7 @@ pub fn normalize_logs(msg_store: Arc<MsgStore>, worktree_path: &Path) {
                                 },
                                 content: message,
                                 metadata: None,
+                                parent_tool_use_id: None,
                             },
                         ),
                     );
@@ -265,6 +270,7 @@ impl LogState {
                         entry_type: NormalizedEntryType::ErrorMessage { error_type },
                         content: message,
                         metadata: None,
+                        parent_tool_use_id: None,
                     },
                 );
             }
@@ -325,6 +331,7 @@ impl LogState {
             },
             content: "TODO list updated".to_string(),
             metadata: None,
+            parent_tool_use_id: None,
         };
 
         if let Some(index) = self.todo_update_entry {
@@ -465,6 +472,7 @@ impl LogState {
                         .trim()
                         .to_string(),
                     metadata: None,
+                    parent_tool_use_id: None,
                 },
             );
         }
@@ -603,6 +611,7 @@ fn update_streaming_text(
         entry_type,
         content: state.content.clone(),
         metadata: None,
+        parent_tool_use_id: None,
     };
     upsert_normalized_entry(msg_store, state.index, entry, is_new);
 }
@@ -975,6 +984,7 @@ impl ToolCallState {
                 tool_call_id: self.call_id.clone(),
             })
             .ok(),
+            parent_tool_use_id: None,
         }
     }
 

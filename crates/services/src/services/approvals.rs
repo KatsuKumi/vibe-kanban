@@ -397,6 +397,7 @@ mod tests {
                 })
                 .unwrap(),
             ),
+            parent_tool_use_id: None,
         }
     }
 

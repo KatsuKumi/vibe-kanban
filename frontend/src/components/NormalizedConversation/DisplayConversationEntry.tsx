@@ -737,10 +737,11 @@ function DisplayConversationEntry({
   const isUserFeedback = entryType.type === 'user_feedback';
   const isLoading = entryType.type === 'loading';
   const isTokenUsage = entryType.type === 'token_usage_info';
+  const isRateLimitInfo = entryType.type === 'rate_limit_info';
   const isFileEdit = (a: ActionType): a is FileEditAction =>
     a.action === 'file_edit';
 
-  if (isTokenUsage) {
+  if (isTokenUsage || isRateLimitInfo) {
     return null;
   }
 

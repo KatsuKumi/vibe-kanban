@@ -5,6 +5,7 @@ import {
   NormalizedEntry,
   PatchType,
   TokenUsageInfo,
+  RateLimitInfo,
   ToolStatus,
 } from 'shared/types';
 import { useExecutionProcessesContext } from '@/contexts/ExecutionProcessesContext';
@@ -58,7 +59,7 @@ export const useConversationHistory = ({
     isLoading,
     isConnected,
   } = useExecutionProcessesContext();
-  const { setTokenUsageInfo } = useEntries();
+  const { setTokenUsageInfo, setRateLimitInfo } = useEntries();
   const executionProcesses = useRef<ExecutionProcess[]>(executionProcessesRaw);
   const displayedExecutionProcesses = useRef<ExecutionProcessStateStore>({});
   const loadedInitialEntries = useRef(false);
@@ -183,6 +184,7 @@ export const useConversationHistory = ({
       let needsSetup = false;
       let setupHelpText: string | undefined;
       let latestTokenUsageInfo: TokenUsageInfo | null = null;
+      let latestRateLimitInfo: RateLimitInfo | null = null;
 
       // Create user messages + tool calls for setup/cleanup scripts
       const allEntries = Object.values(executionProcessState)
@@ -235,12 +237,22 @@ export const useConversationHistory = ({
                 .entry_type as TokenUsageInfo;
             }
 
-            // Remove user messages (replaced with custom one) and token usage info (displayed separately)
+            const rateLimitEntry = p.entries.findLast(
+              (e) =>
+                e.type === 'NORMALIZED_ENTRY' &&
+                e.content.entry_type.type === 'rate_limit_info'
+            );
+            if (rateLimitEntry?.type === 'NORMALIZED_ENTRY') {
+              latestRateLimitInfo = rateLimitEntry.content
+                .entry_type as unknown as RateLimitInfo;
+            }
+
             const entriesExcludingUser = p.entries.filter(
               (e) =>
                 e.type !== 'NORMALIZED_ENTRY' ||
                 (e.content.entry_type.type !== 'user_message' &&
-                  e.content.entry_type.type !== 'token_usage_info')
+                  e.content.entry_type.type !== 'token_usage_info' &&
+                  e.content.entry_type.type !== 'rate_limit_info')
             );
 
             const hasPendingApprovalEntry = entriesExcludingUser.some(
@@ -413,12 +425,12 @@ export const useConversationHistory = ({
         );
       }
 
-      // Update token usage info in context
       setTokenUsageInfo(latestTokenUsageInfo);
+      setRateLimitInfo(latestRateLimitInfo);
 
       return allEntries;
     },
-    [setTokenUsageInfo]
+    [setTokenUsageInfo, setRateLimitInfo]
   );
 
   const emitEntries = useCallback(

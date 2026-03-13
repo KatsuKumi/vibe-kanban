@@ -161,6 +161,7 @@ function translateMessage(msg) {
         event: msg.event,
         session_id: msg.session_id,
         uuid: msg.uuid,
+        parent_tool_use_id: msg.parent_tool_use_id ?? undefined,
       });
       break;
 

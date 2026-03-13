@@ -48,6 +48,7 @@ import {
 } from './Dropdown';
 import { type ExecutorProps } from './CreateChatBox';
 import { ContextUsageGauge } from './ContextUsageGauge';
+import { RateLimitStatusBar } from './RateLimitStatusBar';
 import { TodoProgressPopup } from './TodoProgressPopup';
 import { useUserSystem } from '@/components/ConfigProvider';
 
@@ -650,6 +651,7 @@ export function SessionChatBox({
           )}
           {/* Todo progress popup - always rendered, disabled when no todos */}
           <TodoProgressPopup todos={todos ?? []} />
+          <RateLimitStatusBar />
           {supportsContextUsage && (
             <ContextUsageGauge tokenUsageInfo={tokenUsageInfo} />
           )}

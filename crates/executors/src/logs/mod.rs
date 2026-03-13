@@ -96,6 +96,7 @@ pub enum NormalizedEntryType {
         needs_setup: bool,
     },
     TokenUsageInfo(TokenUsageInfo),
+    RateLimitInfo(RateLimitInfo),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
@@ -105,12 +106,30 @@ pub struct TokenUsageInfo {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct RateLimitInfo {
+    pub status: String,
+    #[serde(default)]
+    #[ts(optional)]
+    pub resets_at: Option<u64>,
+    #[serde(default)]
+    #[ts(optional)]
+    pub rate_limit_type: Option<String>,
+    #[serde(default)]
+    #[ts(optional)]
+    pub utilization: Option<f64>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
 pub struct NormalizedEntry {
     pub timestamp: Option<String>,
     pub entry_type: NormalizedEntryType,
     pub content: String,
     #[ts(skip)]
     pub metadata: Option<serde_json::Value>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub parent_tool_use_id: Option<String>,
 }
 
 impl NormalizedEntry {

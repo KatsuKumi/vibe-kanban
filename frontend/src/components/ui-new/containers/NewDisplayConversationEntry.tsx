@@ -352,7 +352,9 @@ function NewDisplayConversationEntry(props: Props) {
       return null;
 
     case 'token_usage_info':
-      // Displayed in the chat header as the context-usage gauge
+      return null;
+
+    case 'rate_limit_info':
       return null;
 
     case 'user_feedback':
@@ -976,15 +978,54 @@ function AggregatedDiffGroupEntry({ group }: { group: AggregatedDiffGroup }) {
   );
 }
 
+const SUBAGENT_BORDER_COLORS = [
+  'border-l-blue-400',
+  'border-l-purple-400',
+  'border-l-emerald-400',
+  'border-l-amber-400',
+  'border-l-rose-400',
+  'border-l-cyan-400',
+];
+
+const subagentColorMap = new Map<string, string>();
+
+function getSubagentBorderColor(parentToolUseId: string): string {
+  const existing = subagentColorMap.get(parentToolUseId);
+  if (existing) return existing;
+  const color =
+    SUBAGENT_BORDER_COLORS[subagentColorMap.size % SUBAGENT_BORDER_COLORS.length];
+  subagentColorMap.set(parentToolUseId, color);
+  return color;
+}
+
+function extractParentToolUseIdFromGroup(
+  aggregatedGroup: AggregatedPatchGroup | null,
+  aggregatedDiffGroup: AggregatedDiffGroup | null
+): string | undefined {
+  const firstEntry =
+    aggregatedGroup?.entries[0] ?? aggregatedDiffGroup?.entries[0];
+  if (!firstEntry || firstEntry.type !== 'NORMALIZED_ENTRY') return undefined;
+  return firstEntry.content.parent_tool_use_id ?? undefined;
+}
+
 const NewDisplayConversationEntrySpaced = (props: Props) => {
   const { isEntryGreyed } = useMessageEditContext();
   const isGreyed = isEntryGreyed(props.expansionKey);
+
+  const parentToolUseId =
+    props.entry?.parent_tool_use_id ??
+    extractParentToolUseIdFromGroup(props.aggregatedGroup, props.aggregatedDiffGroup);
+  const isSubagent = Boolean(parentToolUseId);
+  const borderColor = parentToolUseId
+    ? getSubagentBorderColor(parentToolUseId)
+    : '';
 
   return (
     <div
       className={cn(
         'my-base px-double',
-        isGreyed && 'opacity-50 pointer-events-none'
+        isGreyed && 'opacity-50 pointer-events-none',
+        isSubagent && `border-l-2 ml-base pl-base ${borderColor}`
       )}
     >
       <NewDisplayConversationEntry {...props} />

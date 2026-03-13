@@ -1279,6 +1279,7 @@ pub trait ContainerService {
                     },
                     content: help_text,
                     metadata: None,
+                    parent_tool_use_id: None,
                 };
                 let patch = ConversationPatch::add_normalized_entry(2, error_message);
                 if let Ok(json_line) = serde_json::to_string::<LogMsg>(&LogMsg::JsonPatch(patch)) {

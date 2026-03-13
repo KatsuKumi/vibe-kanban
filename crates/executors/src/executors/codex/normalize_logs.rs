@@ -106,6 +106,7 @@ impl ToNormalizedEntry for CommandState {
                 tool_call_id: self.call_id.clone(),
             })
             .ok(),
+            parent_tool_use_id: None,
         }
     }
 }
@@ -133,6 +134,7 @@ impl ToNormalizedEntry for McpToolState {
             },
             content: self.invocation.tool.clone(),
             metadata: None,
+            parent_tool_use_id: None,
         }
     }
 }
@@ -166,6 +168,7 @@ impl ToNormalizedEntry for WebSearchState {
                 .clone()
                 .unwrap_or_else(|| "Web search".to_string()),
             metadata: None,
+            parent_tool_use_id: None,
         }
     }
 }
@@ -203,6 +206,7 @@ impl ToNormalizedEntry for PatchEntry {
                 tool_call_id: self.call_id.clone(),
             })
             .ok(),
+            parent_tool_use_id: None,
         }
     }
 }
@@ -267,6 +271,7 @@ impl LogState {
             },
             content: content.clone(),
             metadata: None,
+            parent_tool_use_id: None,
         };
         (normalized_entry, index, is_new)
     }
@@ -676,6 +681,7 @@ pub fn normalize_logs(msg_store: Arc<MsgStore>, worktree_path: &Path) {
                             entry_type: NormalizedEntryType::SystemMessage,
                             content: format!("Background event: {message}"),
                             metadata: None,
+                            parent_tool_use_id: None,
                         },
                     );
                 }
@@ -694,6 +700,7 @@ pub fn normalize_logs(msg_store: Arc<MsgStore>, worktree_path: &Path) {
                             },
                             content: format!("Stream error: {message} {codex_error_info:?}"),
                             metadata: None,
+                            parent_tool_use_id: None,
                         },
                     );
                 }
@@ -923,6 +930,7 @@ pub fn normalize_logs(msg_store: Arc<MsgStore>, worktree_path: &Path) {
                             },
                             content: relative_path.to_string(),
                             metadata: None,
+                            parent_tool_use_id: None,
                         },
                     );
                 }
@@ -963,6 +971,7 @@ pub fn normalize_logs(msg_store: Arc<MsgStore>, worktree_path: &Path) {
                             },
                             content,
                             metadata: None,
+                            parent_tool_use_id: None,
                         },
                     );
                 }
@@ -977,6 +986,7 @@ pub fn normalize_logs(msg_store: Arc<MsgStore>, worktree_path: &Path) {
                             },
                             content: message,
                             metadata: None,
+                            parent_tool_use_id: None,
                         },
                     );
                 }
@@ -994,6 +1004,7 @@ pub fn normalize_logs(msg_store: Arc<MsgStore>, worktree_path: &Path) {
                             },
                             content: format!("Error: {message} {codex_error_info:?}"),
                             metadata: None,
+                            parent_tool_use_id: None,
                         },
                     );
                 }
@@ -1019,6 +1030,7 @@ pub fn normalize_logs(msg_store: Arc<MsgStore>, worktree_path: &Path) {
                                     info.model_context_window.unwrap_or_default()
                                 ),
                                 metadata: None,
+                                parent_tool_use_id: None,
                             },
                         );
                     }
@@ -1032,6 +1044,7 @@ pub fn normalize_logs(msg_store: Arc<MsgStore>, worktree_path: &Path) {
                             entry_type: NormalizedEntryType::SystemMessage,
                             content: "Context compacted".to_string(),
                             metadata: None,
+                            parent_tool_use_id: None,
                         },
                     );
                 }
@@ -1120,6 +1133,7 @@ fn handle_model_params(
             entry_type: NormalizedEntryType::SystemMessage,
             content: params.join("  ").to_string(),
             metadata: None,
+            parent_tool_use_id: None,
         },
     );
 }
@@ -1180,6 +1194,7 @@ impl ToNormalizedEntry for Error {
                 },
                 content: error.clone(),
                 metadata: None,
+                parent_tool_use_id: None,
             },
             Error::AuthRequired { error } => NormalizedEntry {
                 timestamp: None,
@@ -1188,6 +1203,7 @@ impl ToNormalizedEntry for Error {
                 },
                 content: error.clone(),
                 metadata: None,
+                parent_tool_use_id: None,
             },
         }
     }
@@ -1253,6 +1269,7 @@ impl ToNormalizedEntryOpt for Approval {
                     .trim()
                     .to_string(),
                 metadata: None,
+                parent_tool_use_id: None,
             }),
             ApprovalStatus::TimedOut => Some(NormalizedEntry {
                 timestamp: None,
@@ -1261,6 +1278,7 @@ impl ToNormalizedEntryOpt for Approval {
                 },
                 content: format!("Approval timed out for tool {tool_name}"),
                 metadata: None,
+                parent_tool_use_id: None,
             }),
         }
     }
