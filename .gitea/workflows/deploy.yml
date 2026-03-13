@@ -1,0 +1,37 @@
+name: Deploy Vibe Kanban
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+env:
+  PROJECT_DIR: /home/claude/vibe-kanban
+
+jobs:
+  deploy:
+    runs-on: linux
+    steps:
+      - name: Pull latest
+        run: |
+          cd $PROJECT_DIR
+          git fetch origin main
+          git reset --hard origin/main
+          git submodule update --init --recursive
+
+      - name: Build frontend
+        run: |
+          cd $PROJECT_DIR/frontend
+          npm install --no-audit --no-fund
+          npm run build
+
+      - name: Build backend
+        run: |
+          cd $PROJECT_DIR
+          cargo build 2>&1
+
+      - name: Restart service
+        run: |
+          sudo systemctl restart vibe-kanban
+          sleep 2
+          sudo systemctl is-active vibe-kanban
