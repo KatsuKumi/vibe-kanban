@@ -2,6 +2,7 @@ mod detection;
 mod types;
 
 pub mod azure;
+pub mod gitea;
 pub mod github;
 
 use std::path::Path;
@@ -15,7 +16,7 @@ pub use types::{
     ProviderKind, ReviewCommentUser, UnifiedPrComment,
 };
 
-use self::{azure::AzureDevOpsProvider, github::GitHubProvider};
+use self::{azure::AzureDevOpsProvider, gitea::GiteaProvider, github::GitHubProvider};
 
 #[async_trait]
 #[enum_dispatch(GitHostService)]
@@ -56,6 +57,7 @@ pub trait GitHostProvider: Send + Sync {
 pub enum GitHostService {
     GitHub(GitHubProvider),
     AzureDevOps(AzureDevOpsProvider),
+    Gitea(GiteaProvider),
 }
 
 impl GitHostService {
@@ -63,6 +65,7 @@ impl GitHostService {
         match detect_provider_from_url(url) {
             ProviderKind::GitHub => Ok(Self::GitHub(GitHubProvider::new()?)),
             ProviderKind::AzureDevOps => Ok(Self::AzureDevOps(AzureDevOpsProvider::new()?)),
+            ProviderKind::Gitea => Ok(Self::Gitea(GiteaProvider::new()?)),
             ProviderKind::Unknown => Err(GitHostError::UnsupportedProvider),
         }
     }

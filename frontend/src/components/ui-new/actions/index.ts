@@ -6,6 +6,7 @@ import type {
   EditorType,
   ExecutionProcess,
   Merge,
+  RepoBranchStatus,
   Workspace,
 } from 'shared/types';
 import type { DiffViewMode } from '@/stores/useDiffViewStore';
@@ -946,8 +947,11 @@ export const Actions = {
     requiresTarget: ActionTargetType.GIT,
     isVisible: (ctx) => ctx.hasWorkspace && ctx.hasGitRepos,
     execute: async (ctx, workspaceId, repoId) => {
-      // Check for existing conflicts first
-      const branchStatus = await attemptsApi.getBranchStatus(workspaceId);
+      const branchStatus =
+        ctx.queryClient.getQueryData<RepoBranchStatus[]>([
+          'branchStatus',
+          workspaceId,
+        ]) ?? (await attemptsApi.getBranchStatus(workspaceId));
       const repoStatus = branchStatus?.find((s) => s.repo_id === repoId);
 
       // Check if repo has an open PR - cannot merge directly

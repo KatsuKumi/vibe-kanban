@@ -1,4 +1,5 @@
 import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useActions } from '@/contexts/ActionsContext';
 import { usePush } from '@/hooks/usePush';
 import { useRenameBranch } from '@/hooks/useRenameBranch';
@@ -8,6 +9,7 @@ import { ForcePushDialog } from '@/components/dialogs/git/ForcePushDialog';
 import { CommandBarDialog } from '@/components/ui-new/dialogs/CommandBarDialog';
 import { GitPanel, type RepoInfo } from '@/components/ui-new/views/GitPanel';
 import { Actions } from '@/components/ui-new/actions';
+import { workspaceSummaryKeys } from '@/components/ui-new/hooks/useWorkspaces';
 import type { RepoAction } from '@/components/ui-new/primitives/RepoCard';
 import type { Workspace, RepoWithTargetBranch, Merge } from 'shared/types';
 
@@ -23,10 +25,23 @@ export function GitPanelContainer({
   repos,
 }: GitPanelContainerProps) {
   const { executeAction } = useActions();
+  const queryClient = useQueryClient();
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
-  // Hooks for branch management (moved from WorkspacesLayout)
   const renameBranch = useRenameBranch(selectedWorkspace?.id);
   const { data: branchStatus } = useBranchStatus(selectedWorkspace?.id);
+
+  const handleRefresh = useCallback(async () => {
+    setIsRefreshing(true);
+    try {
+      await Promise.allSettled([
+        queryClient.refetchQueries({ queryKey: ['branchStatus', selectedWorkspace?.id] }),
+        queryClient.refetchQueries({ queryKey: workspaceSummaryKeys.byArchived(false) }),
+      ]);
+    } finally {
+      setIsRefreshing(false);
+    }
+  }, [queryClient, selectedWorkspace?.id]);
 
   const handleBranchNameChange = useCallback(
     (newName: string) => {
@@ -235,6 +250,8 @@ export function GitPanelContainer({
       onActionsClick={handleActionsClick}
       onPushClick={handlePushClick}
       onMoreClick={handleMoreClick}
+      onRefresh={handleRefresh}
+      isRefreshing={isRefreshing}
       onAddRepo={() => console.log('Add repo clicked')}
     />
   );

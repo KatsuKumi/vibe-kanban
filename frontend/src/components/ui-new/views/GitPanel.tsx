@@ -1,4 +1,4 @@
-import { GitBranchIcon } from '@phosphor-icons/react';
+import { GitBranchIcon, ArrowsClockwiseIcon } from '@phosphor-icons/react';
 import { useTranslation } from 'react-i18next';
 import { cn } from '@/lib/utils';
 import {
@@ -32,9 +32,11 @@ interface GitPanelProps {
   onActionsClick?: (repoId: string, action: RepoAction) => void;
   onPushClick?: (repoId: string) => void;
   onMoreClick?: (repoId: string) => void;
+  onRefresh?: () => void;
   onAddRepo?: () => void;
   className?: string;
   error?: string | null;
+  isRefreshing?: boolean;
 }
 
 export function GitPanel({
@@ -44,8 +46,10 @@ export function GitPanel({
   onActionsClick,
   onPushClick,
   onMoreClick,
+  onRefresh,
   className,
   error,
+  isRefreshing,
 }: GitPanelProps) {
   const { t } = useTranslation(['tasks', 'common']);
 
@@ -58,6 +62,20 @@ export function GitPanel({
     >
       {error && <ErrorAlert message={error} />}
       <div className="gap-base px-base">
+        {onRefresh && (
+          <div className="flex justify-end pt-half">
+            <button
+              onClick={onRefresh}
+              disabled={isRefreshing}
+              className="flex items-center gap-1 text-xs text-low hover:text-normal transition-colors disabled:opacity-50"
+              title="Refresh git status"
+            >
+              <ArrowsClockwiseIcon
+                className={cn('size-icon-sm', isRefreshing && 'animate-spin')}
+              />
+            </button>
+          </div>
+        )}
         {repos.map((repo) => (
           <RepoCard
             key={repo.id}

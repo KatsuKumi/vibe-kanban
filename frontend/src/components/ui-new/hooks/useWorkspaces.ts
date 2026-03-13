@@ -153,22 +153,21 @@ export function useWorkspaces(): UseWorkspacesResult {
       queryKey: workspaceSummaryKeys.byArchived(false),
       queryFn: () => fetchWorkspaceSummariesByArchived(false),
       enabled: activeIsInitialized,
-      staleTime: 1000,
-      refetchInterval: 15000,
-      refetchOnWindowFocus: false,
+      staleTime: 15_000,
+      refetchInterval: 30_000,
+      refetchOnWindowFocus: true,
       refetchOnMount: 'always',
       placeholderData: keepPreviousData,
     });
 
-  // Fetch summaries for archived workspaces
   const { data: archivedSummaries = new Map<string, WorkspaceSummary>() } =
     useQuery({
       queryKey: workspaceSummaryKeys.byArchived(true),
       queryFn: () => fetchWorkspaceSummariesByArchived(true),
       enabled: archivedIsInitialized,
-      staleTime: 1000,
-      refetchInterval: 15000,
-      refetchOnWindowFocus: false,
+      staleTime: 60_000,
+      refetchInterval: 120_000,
+      refetchOnWindowFocus: true,
       refetchOnMount: 'always',
       placeholderData: keepPreviousData,
     });

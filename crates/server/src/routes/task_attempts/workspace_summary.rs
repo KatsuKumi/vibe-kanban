@@ -107,27 +107,31 @@ pub async fn get_workspace_summaries(
     // 6. Get PR status for each workspace
     let pr_statuses = Merge::get_latest_pr_status_for_workspaces(pool, archived).await?;
 
-    // 7. Compute diff stats for each workspace (in parallel)
-    let diff_futures: Vec<_> = workspaces
-        .iter()
-        .map(|ws| {
-            let workspace = ws.clone();
-            let deployment = deployment.clone();
-            async move {
-                if workspace.container_ref.is_some() {
+    let diff_stats: HashMap<Uuid, DiffStats> = if archived {
+        HashMap::new()
+    } else {
+        let diff_futures: Vec<_> = workspaces
+            .iter()
+            .filter(|ws| ws.container_ref.is_some())
+            .map(|ws| {
+                let workspace = ws.clone();
+                let deployment = deployment.clone();
+                async move {
                     compute_workspace_diff_stats(&deployment, &workspace)
                         .await
                         .map(|stats| (workspace.id, stats))
-                } else {
-                    None
                 }
-            }
-        })
-        .collect();
+            })
+            .collect();
 
-    let diff_results: Vec<Option<(Uuid, DiffStats)>> =
-        futures_util::future::join_all(diff_futures).await;
-    let diff_stats: HashMap<Uuid, DiffStats> = diff_results.into_iter().flatten().collect();
+        use futures_util::StreamExt;
+        let diff_results: Vec<Option<(Uuid, DiffStats)>> =
+            futures_util::stream::iter(diff_futures)
+                .buffer_unordered(4)
+                .collect()
+                .await;
+        diff_results.into_iter().flatten().collect()
+    };
 
     // 8. Assemble response
     let summaries: Vec<WorkspaceSummary> = workspaces

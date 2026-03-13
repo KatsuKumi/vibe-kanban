@@ -1,4 +1,9 @@
-use std::{collections::HashMap, path::Path};
+use std::{
+    collections::HashMap,
+    path::Path,
+    sync::{Arc, Mutex},
+    time::{Duration, Instant},
+};
 
 use chrono::{DateTime, Utc};
 use git2::{
@@ -53,9 +58,13 @@ pub enum GitServiceError {
     #[error("Rebase in progress; resolve or abort it before retrying")]
     RebaseInProgress,
 }
+const FETCH_COOLDOWN: Duration = Duration::from_secs(60);
+
 /// Service for managing Git operations in task execution workflows
 #[derive(Clone)]
-pub struct GitService {}
+pub struct GitService {
+    fetch_cache: Arc<Mutex<HashMap<String, Instant>>>,
+}
 
 // Max inline diff size for UI (in bytes). Files larger than this will have
 // their contents omitted from the diff stream to avoid UI crashes.
@@ -167,9 +176,10 @@ impl Default for GitService {
 }
 
 impl GitService {
-    /// Create a new GitService for the given repository path
     pub fn new() -> Self {
-        Self {}
+        Self {
+            fetch_cache: Arc::new(Mutex::new(HashMap::new())),
+        }
     }
 
     pub fn is_branch_name_valid(&self, name: &str) -> bool {
@@ -1028,8 +1038,9 @@ impl GitService {
     fn check_worktree_clean(&self, repo: &Repository) -> Result<(), GitServiceError> {
         let mut status_options = git2::StatusOptions::new();
         status_options
-            .include_untracked(false) // Don't include untracked files
-            .include_ignored(false); // Don't include ignored files
+            .include_untracked(false)
+            .include_ignored(false)
+            .exclude_submodules(true);
 
         let statuses = repo.statuses(Some(&mut status_options))?;
 
@@ -1038,17 +1049,27 @@ impl GitService {
             for entry in statuses.iter() {
                 let status = entry.status();
                 // Only consider files that are actually tracked and modified
-                if status.intersects(
-                    git2::Status::INDEX_MODIFIED
-                        | git2::Status::INDEX_NEW
-                        | git2::Status::INDEX_DELETED
-                        | git2::Status::INDEX_RENAMED
-                        | git2::Status::INDEX_TYPECHANGE
-                        | git2::Status::WT_MODIFIED
-                        | git2::Status::WT_DELETED
-                        | git2::Status::WT_RENAMED
-                        | git2::Status::WT_TYPECHANGE,
-                ) && let Some(path) = entry.path()
+                let is_gitlink = entry
+                    .index_to_workdir()
+                    .or_else(|| entry.head_to_index())
+                    .is_some_and(|delta| {
+                        delta.old_file().mode() == git2::FileMode::Commit
+                            || delta.new_file().mode() == git2::FileMode::Commit
+                    });
+
+                if !is_gitlink
+                    && status.intersects(
+                        git2::Status::INDEX_MODIFIED
+                            | git2::Status::INDEX_NEW
+                            | git2::Status::INDEX_DELETED
+                            | git2::Status::INDEX_RENAMED
+                            | git2::Status::INDEX_TYPECHANGE
+                            | git2::Status::WT_MODIFIED
+                            | git2::Status::WT_DELETED
+                            | git2::Status::WT_RENAMED
+                            | git2::Status::WT_TYPECHANGE,
+                    )
+                    && let Some(path) = entry.path()
                 {
                     dirty_files.push(path.to_string());
                 }
@@ -1545,46 +1566,61 @@ impl GitService {
         Ok(())
     }
 
-    /// Return true if a rebase is currently in progress in this worktree.
     pub fn is_rebase_in_progress(&self, worktree_path: &Path) -> Result<bool, GitServiceError> {
-        let git = GitCli::new();
-        git.is_rebase_in_progress(worktree_path).map_err(|e| {
-            GitServiceError::InvalidRepository(format!("git rebase state check failed: {e}"))
-        })
+        let repo = self.open_repo(worktree_path)?;
+        let git_path = repo.path();
+        Ok(git_path.join("rebase-merge").exists() || git_path.join("rebase-apply").exists())
     }
 
     pub fn detect_conflict_op(
         &self,
         worktree_path: &Path,
     ) -> Result<Option<ConflictOp>, GitServiceError> {
-        let git = GitCli::new();
-        if git.is_rebase_in_progress(worktree_path).unwrap_or(false) {
+        let is_rebasing = self
+            .is_rebase_in_progress(worktree_path)
+            .unwrap_or(false);
+        self.detect_conflict_op_with_rebase_state(worktree_path, is_rebasing)
+    }
+
+    pub fn detect_conflict_op_with_rebase_state(
+        &self,
+        worktree_path: &Path,
+        is_rebasing: bool,
+    ) -> Result<Option<ConflictOp>, GitServiceError> {
+        if is_rebasing {
             return Ok(Some(ConflictOp::Rebase));
         }
-        if git.is_merge_in_progress(worktree_path).unwrap_or(false) {
+        let repo = self.open_repo(worktree_path)?;
+        let git_path = repo.path();
+        if git_path.join("MERGE_HEAD").exists() {
             return Ok(Some(ConflictOp::Merge));
         }
-        if git
-            .is_cherry_pick_in_progress(worktree_path)
-            .unwrap_or(false)
-        {
+        if git_path.join("CHERRY_PICK_HEAD").exists() {
             return Ok(Some(ConflictOp::CherryPick));
         }
-        if git.is_revert_in_progress(worktree_path).unwrap_or(false) {
+        if git_path.join("REVERT_HEAD").exists() {
             return Ok(Some(ConflictOp::Revert));
         }
         Ok(None)
     }
 
-    /// List conflicted (unmerged) files in the worktree.
     pub fn get_conflicted_files(
         &self,
         worktree_path: &Path,
     ) -> Result<Vec<String>, GitServiceError> {
-        let git = GitCli::new();
-        git.get_conflicted_files(worktree_path).map_err(|e| {
-            GitServiceError::InvalidRepository(format!("git diff for conflicts failed: {e}"))
-        })
+        let repo = self.open_repo(worktree_path)?;
+        let mut opts = git2::StatusOptions::new();
+        opts.include_untracked(false).include_ignored(false);
+        let statuses = repo.statuses(Some(&mut opts))?;
+        let mut conflicts = Vec::new();
+        for entry in statuses.iter() {
+            if entry.status().is_conflicted() {
+                if let Some(path) = entry.path() {
+                    conflicts.push(path.to_string());
+                }
+            }
+        }
+        Ok(conflicts)
     }
 
     /// Abort an in-progress rebase in this worktree (no-op if none).
@@ -1835,16 +1871,35 @@ impl GitService {
         self.fetch_from_remote(repo, &remote, &refspec)
     }
 
-    /// Fetch from remote repository using native git authentication
     fn fetch_all_from_remote(
         &self,
         repo: &Repository,
         remote: &Remote,
     ) -> Result<(), GitServiceError> {
+        let remote_url = remote
+            .url()
+            .ok_or_else(|| GitServiceError::InvalidRepository("Remote has no URL".into()))?;
+
+        {
+            let cache = self.fetch_cache.lock().unwrap();
+            if let Some(last_fetch) = cache.get(remote_url) {
+                if last_fetch.elapsed() < FETCH_COOLDOWN {
+                    return Ok(());
+                }
+            }
+        }
+
         let default_remote = self.default_remote(repo, repo.path())?;
         let remote_name = remote.name().unwrap_or(&default_remote.name);
         let refspec = format!("+refs/heads/*:refs/remotes/{remote_name}/*");
-        self.fetch_from_remote(repo, remote, &refspec)
+        self.fetch_from_remote(repo, remote, &refspec)?;
+
+        {
+            let mut cache = self.fetch_cache.lock().unwrap();
+            cache.insert(remote_url.to_string(), Instant::now());
+        }
+
+        Ok(())
     }
 
     /// Clone a repository to the specified directory

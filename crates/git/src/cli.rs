@@ -20,6 +20,7 @@ use std::{
     io::Write as _,
     path::Path,
     process::{Command, Stdio},
+    time::{Duration, Instant},
 };
 
 use thiserror::Error;
@@ -27,10 +28,14 @@ use utils::{path::ALWAYS_SKIP_DIRS, shell::resolve_executable_path_blocking};
 
 use super::Commit;
 
+const GIT_COMMAND_TIMEOUT: Duration = Duration::from_secs(30);
+
 #[derive(Debug, Error)]
 pub enum GitCliError {
     #[error("git executable not found or not runnable")]
     NotAvailable,
+    #[error("git command timed out after {0}s")]
+    TimedOut(u64),
     #[error("git command failed: {0}")]
     CommandFailed(String),
     #[error("authentication failed: {0}")]
@@ -801,13 +806,47 @@ impl GitCli {
             None
         };
 
-        let out = child
-            .wait_with_output()
-            .map_err(|e| GitCliError::CommandFailed(e.to_string()))?;
+        let stdout_handle = child.stdout.take();
+        let stderr_handle = child.stderr.take();
 
-        if !out.status.success() {
-            let stderr = String::from_utf8_lossy(&out.stderr).trim().to_string();
-            let stdout = String::from_utf8_lossy(&out.stdout).trim().to_string();
+        let stdout_thread = std::thread::spawn(move || {
+            let mut buf = Vec::new();
+            if let Some(mut out) = stdout_handle {
+                let _ = std::io::Read::read_to_end(&mut out, &mut buf);
+            }
+            buf
+        });
+
+        let stderr_thread = std::thread::spawn(move || {
+            let mut buf = Vec::new();
+            if let Some(mut err) = stderr_handle {
+                let _ = std::io::Read::read_to_end(&mut err, &mut buf);
+            }
+            buf
+        });
+
+        let deadline = Instant::now() + GIT_COMMAND_TIMEOUT;
+        let exit_status = loop {
+            match child.try_wait() {
+                Ok(Some(status)) => break status,
+                Ok(None) if Instant::now() < deadline => {
+                    std::thread::sleep(Duration::from_millis(50));
+                }
+                Ok(None) => {
+                    let _ = child.kill();
+                    let _ = child.wait();
+                    return Err(GitCliError::TimedOut(GIT_COMMAND_TIMEOUT.as_secs()));
+                }
+                Err(e) => return Err(GitCliError::CommandFailed(e.to_string())),
+            }
+        };
+
+        let stdout_data = stdout_thread.join().unwrap_or_default();
+        let stderr_data = stderr_thread.join().unwrap_or_default();
+
+        if !exit_status.success() {
+            let stderr = String::from_utf8_lossy(&stderr_data).trim().to_string();
+            let stdout = String::from_utf8_lossy(&stdout_data).trim().to_string();
             let combined = match (stdout.is_empty(), stderr.is_empty()) {
                 (true, true) => "Command failed with no output".to_string(),
                 (false, false) => format!("--- stderr\n{stderr}\n--- stdout\n{stdout}"),
@@ -821,7 +860,7 @@ impl GitCli {
                 "failed to write to git stdin: {e}"
             )));
         }
-        Ok(out.stdout)
+        Ok(stdout_data)
     }
 
     pub fn git<I, S>(&self, repo_path: &Path, args: I) -> Result<String, GitCliError>

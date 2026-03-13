@@ -316,6 +316,14 @@ impl IntoResponse for ApiError {
                 "GitServiceError",
                 "A rebase is already in progress. Resolve conflicts or abort the rebase, then retry.",
             ),
+            ApiError::GitService(git::GitServiceError::WorktreeDirty(branch, details)) => {
+                ErrorInfo::conflict(
+                    "GitServiceError",
+                    format!(
+                        "Branch '{branch}' has uncommitted changes: {details}. Commit or stash changes before rebasing.",
+                    ),
+                )
+            }
             ApiError::GitService(_) => ErrorInfo::internal("GitServiceError"),
             ApiError::GitHost(_) => ErrorInfo::internal("GitHostError"),
 
@@ -377,6 +385,9 @@ impl IntoResponse for ApiError {
             ApiError::Container(_) => ErrorInfo::internal("ContainerError"),
             ApiError::Executor(_) => ErrorInfo::internal("ExecutorError"),
             ApiError::CommandBuilder(_) => ErrorInfo::internal("CommandBuildError"),
+            ApiError::Database(sqlx::Error::RowNotFound) => {
+                ErrorInfo::not_found("NotFound", "The requested resource was not found.")
+            }
             ApiError::Database(_) => ErrorInfo::internal("DatabaseError"),
             ApiError::Worktree(_) => ErrorInfo::internal("WorktreeError"),
             ApiError::Config(_) => ErrorInfo::internal("ConfigError"),

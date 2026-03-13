@@ -3,7 +3,7 @@ use std::{
     io,
     path::{Path, PathBuf},
     sync::Arc,
-    time::Duration,
+    time::{Duration, Instant},
 };
 
 use anyhow::anyhow;
@@ -16,6 +16,7 @@ use db::{
         execution_process::{
             ExecutionContext, ExecutionProcess, ExecutionProcessRunReason, ExecutionProcessStatus,
         },
+        execution_process_logs::ExecutionProcessLogs,
         execution_process_repo_state::ExecutionProcessRepoState,
         log_buffer::LogBuffer,
         repo::Repo,
@@ -79,6 +80,7 @@ pub struct LocalContainerService {
     queued_message_service: QueuedMessageService,
     notification_service: NotificationService,
     remote_client: Option<RemoteClient>,
+    worktree_cache: Arc<RwLock<HashMap<Uuid, (String, Instant)>>>,
 }
 
 impl LocalContainerService {
@@ -115,6 +117,7 @@ impl LocalContainerService {
             queued_message_service,
             notification_service,
             remote_client,
+            worktree_cache: Arc::new(RwLock::new(HashMap::new())),
         };
 
         container.spawn_workspace_cleanup();
@@ -240,6 +243,26 @@ impl LocalContainerService {
                 cleanup_expired(&db).await.unwrap_or_else(|e| {
                     tracing::error!("Failed to clean up expired workspaces: {}", e)
                 });
+
+                const LOG_RETENTION_DAYS: i64 = 7;
+                match ExecutionProcessLogs::delete_older_than_days(
+                    &db.pool,
+                    LOG_RETENTION_DAYS,
+                )
+                .await
+                {
+                    Ok(deleted) if deleted > 0 => {
+                        tracing::info!(
+                            "Log retention cleanup: deleted {} old log batches (>{} days)",
+                            deleted,
+                            LOG_RETENTION_DAYS
+                        );
+                    }
+                    Err(e) => {
+                        tracing::error!("Failed to clean up old logs: {}", e);
+                    }
+                    _ => {}
+                }
             }
         });
     }
@@ -797,9 +820,6 @@ impl LocalContainerService {
         Ok(())
     }
 
-    /// Create workspace-level CLAUDE.md and AGENTS.md files that import from each repo.
-    /// Uses the @import syntax to reference each repo's config files.
-    /// Skips creating files if they already exist or if no repos have the source file.
     async fn create_workspace_config_files(
         workspace_dir: &Path,
         repos: &[Repo],
@@ -809,23 +829,19 @@ impl LocalContainerService {
         for config_file in CONFIG_FILES {
             let workspace_config_path = workspace_dir.join(config_file);
 
-            if workspace_config_path.exists() {
-                tracing::trace!(
-                    "Workspace config file {} already exists, skipping",
-                    config_file
-                );
-                continue;
-            }
-
-            let mut import_lines = Vec::new();
+            let mut sections = Vec::new();
             for repo in repos {
                 let repo_config_path = workspace_dir.join(&repo.name).join(config_file);
-                if repo_config_path.exists() {
-                    import_lines.push(format!("@{}/{}", repo.name, config_file));
+                if let Ok(content) = tokio::fs::read_to_string(&repo_config_path).await {
+                    if repos.len() > 1 {
+                        sections.push(format!("# From {}\n\n{}", repo.name, content));
+                    } else {
+                        sections.push(content);
+                    }
                 }
             }
 
-            if import_lines.is_empty() {
+            if sections.is_empty() {
                 tracing::trace!(
                     "No repos have {}, skipping workspace config creation",
                     config_file
@@ -833,7 +849,7 @@ impl LocalContainerService {
                 continue;
             }
 
-            let content = import_lines.join("\n") + "\n";
+            let content = sections.join("\n\n") + "\n";
             if let Err(e) = tokio::fs::write(&workspace_config_path, &content).await {
                 tracing::warn!(
                     "Failed to create workspace config file {}: {}",
@@ -844,9 +860,9 @@ impl LocalContainerService {
             }
 
             tracing::info!(
-                "Created workspace {} with {} import(s)",
+                "Created workspace {} with {} repo(s)",
                 config_file,
-                import_lines.len()
+                sections.len()
             );
         }
 
@@ -1049,6 +1065,18 @@ impl ContainerService for LocalContainerService {
         &self,
         workspace: &Workspace,
     ) -> Result<ContainerRef, ContainerError> {
+        const WORKTREE_CACHE_TTL: Duration = Duration::from_secs(60);
+
+        {
+            let cache = self.worktree_cache.read().await;
+            if let Some((cached_ref, checked_at)) = cache.get(&workspace.id) {
+                if checked_at.elapsed() < WORKTREE_CACHE_TTL {
+                    Workspace::touch(&self.db.pool, workspace.id).await?;
+                    return Ok(cached_ref.clone());
+                }
+            }
+        }
+
         Workspace::touch(&self.db.pool, workspace.id).await?;
         let repositories =
             WorkspaceRepo::find_repos_for_workspace(&self.db.pool, workspace.id).await?;
@@ -1083,13 +1111,19 @@ impl ContainerService for LocalContainerService {
             .await?;
         }
 
-        // Copy project files and images (fast no-op if already exist)
         self.copy_files_and_images(&workspace_dir, workspace)
             .await?;
 
         Self::create_workspace_config_files(&workspace_dir, &repositories).await?;
 
-        Ok(workspace_dir.to_string_lossy().to_string())
+        let container_ref = workspace_dir.to_string_lossy().to_string();
+
+        {
+            let mut cache = self.worktree_cache.write().await;
+            cache.insert(workspace.id, (container_ref.clone(), Instant::now()));
+        }
+
+        Ok(container_ref)
     }
 
     async fn is_container_clean(&self, workspace: &Workspace) -> Result<bool, ContainerError> {

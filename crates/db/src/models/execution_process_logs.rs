@@ -47,6 +47,20 @@ impl ExecutionProcessLogs {
         Ok(messages)
     }
 
+    pub async fn delete_older_than_days(
+        pool: &SqlitePool,
+        days: i64,
+    ) -> Result<u64, sqlx::Error> {
+        let result = sqlx::query(
+            "DELETE FROM execution_process_logs WHERE inserted_at < datetime('now', '-' || ? || ' days')",
+        )
+        .bind(days)
+        .execute(pool)
+        .await?;
+
+        Ok(result.rows_affected())
+    }
+
     /// Append a JSONL line to the logs for an execution process
     pub async fn append_log_line(
         pool: &SqlitePool,

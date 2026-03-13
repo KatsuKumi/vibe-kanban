@@ -33,7 +33,24 @@ pub fn detect_provider_from_url(url: &str) -> ProviderKind {
         return ProviderKind::GitHub;
     }
 
+    if looks_like_http_git_url(url) {
+        return ProviderKind::Gitea;
+    }
+
     ProviderKind::Unknown
+}
+
+fn looks_like_http_git_url(url: &str) -> bool {
+    let lower = url.to_lowercase();
+    if lower.starts_with("http://") || lower.starts_with("https://") {
+        let path = lower
+            .strip_prefix("http://")
+            .or_else(|| lower.strip_prefix("https://"))
+            .unwrap_or("");
+        let after_host = path.split_once('/').map(|(_, rest)| rest).unwrap_or("");
+        return after_host.contains('/');
+    }
+    false
 }
 
 /// Detect the git hosting provider from a PR URL.
@@ -137,13 +154,25 @@ mod tests {
     }
 
     #[test]
-    fn test_unknown_provider() {
+    fn test_gitea_fallback_for_http_urls() {
         assert_eq!(
-            detect_provider_from_url("https://gitlab.com/owner/repo"),
-            ProviderKind::Unknown
+            detect_provider_from_url("http://192.168.1.34:3000/claude/vibe-kanban"),
+            ProviderKind::Gitea
         );
         assert_eq!(
-            detect_provider_from_url("https://bitbucket.org/owner/repo"),
+            detect_provider_from_url("http://192.168.1.34:3000/claude/vibe-kanban.git"),
+            ProviderKind::Gitea
+        );
+        assert_eq!(
+            detect_provider_from_url("https://gitea.example.com/owner/repo"),
+            ProviderKind::Gitea
+        );
+    }
+
+    #[test]
+    fn test_unknown_provider() {
+        assert_eq!(
+            detect_provider_from_url("git@custom.server:owner/repo.git"),
             ProviderKind::Unknown
         );
     }

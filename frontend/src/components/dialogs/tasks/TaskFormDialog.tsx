@@ -442,7 +442,7 @@ const TaskFormDialogImpl = NiceModal.create<TaskFormDialogProps>((props) => {
               <div className="border p-3">
                 <WYSIWYGEditor
                   placeholder={t('taskFormDialog.descriptionPlaceholder')}
-                  className="w-full h-24 overflow-auto"
+                  className="w-full min-h-[40vh] overflow-auto"
                   value={field.state.value}
                   onChange={(desc) => field.handleChange(desc)}
                   disabled={isSubmitting}
