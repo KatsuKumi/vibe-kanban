@@ -19,10 +19,14 @@ jobs:
           git checkout origin/main -- .
           git submodule update --init --recursive
 
+      - name: Install dependencies
+        run: |
+          cd $PROJECT_DIR/frontend && npm install --no-audit --no-fund
+          cd $PROJECT_DIR/crates/executors/bridge && npm install --no-audit --no-fund
+
       - name: Build frontend
         run: |
           cd $PROJECT_DIR/frontend
-          npm install --no-audit --no-fund
           npm run build
 
       - name: Build backend
