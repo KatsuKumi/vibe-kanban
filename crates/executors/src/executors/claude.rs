@@ -2202,7 +2202,7 @@ pub enum ClaudeToolData {
     TodoWrite {
         todos: Vec<ClaudeTodoItem>,
     },
-    #[serde(rename = "Task", alias = "task")]
+    #[serde(rename = "Task", alias = "task", alias = "Agent")]
     Task {
         subagent_type: Option<String>,
         description: Option<String>,
