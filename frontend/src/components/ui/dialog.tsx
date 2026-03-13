@@ -116,7 +116,7 @@ const Dialog = React.forwardRef<
       <div
         ref={ref}
         className={cn(
-          'relative z-[9999] flex flex-col w-full max-w-4xl max-h-[90vh] gap-4 bg-primary p-6 shadow-lg duration-200 sm:rounded-lg m-4 overflow-y-auto',
+          'relative z-[9999] flex flex-col max-w-[calc(100%-2rem)] max-h-[90vh] gap-4 bg-primary p-6 shadow-lg duration-200 sm:rounded-lg m-4 overflow-y-auto',
           className
         )}
         {...props}
@@ -182,7 +182,7 @@ const DialogContent = React.forwardRef<
   HTMLDivElement,
   React.HTMLAttributes<HTMLDivElement>
 >(({ className, ...props }, ref) => (
-  <div ref={ref} className={cn('flex flex-col gap-4', className)} {...props} />
+  <div ref={ref} className={cn('flex flex-col gap-4 w-full max-w-4xl', className)} {...props} />
 ));
 DialogContent.displayName = 'DialogContent';
 
