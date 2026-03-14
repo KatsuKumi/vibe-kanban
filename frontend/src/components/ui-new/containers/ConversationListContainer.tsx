@@ -291,9 +291,10 @@ export const ConversationList = forwardRef<
     }
   }, [shouldScrollToLastStart, items]);
 
-  const prevLoadingRef = useRef(true);
+  const initialScrollDoneRef = useRef(false);
   useEffect(() => {
-    if (prevLoadingRef.current && !loading && items.length > 0) {
+    if (!loading && items.length > 0 && !initialScrollDoneRef.current) {
+      initialScrollDoneRef.current = true;
       requestAnimationFrame(() => {
         virtuosoRef.current?.scrollToIndex({
           index: items.length - 1,
@@ -302,8 +303,11 @@ export const ConversationList = forwardRef<
         });
       });
     }
-    prevLoadingRef.current = loading;
   }, [loading, items.length]);
+
+  useEffect(() => {
+    initialScrollDoneRef.current = false;
+  }, [attempt.id]);
 
   const hasContent = !loading || items.length > 0;
 
@@ -371,8 +375,8 @@ export const ConversationList = forwardRef<
   );
 
   const followOutput = useCallback(
-    (isAtBottom: boolean) => {
-      if (shouldFollowOutput && isAtBottom) return 'smooth';
+    (_isAtBottom: boolean) => {
+      if (shouldFollowOutput) return 'smooth';
       return false;
     },
     [shouldFollowOutput]
