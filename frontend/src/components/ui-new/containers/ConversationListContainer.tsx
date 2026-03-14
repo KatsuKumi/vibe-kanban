@@ -291,23 +291,6 @@ export const ConversationList = forwardRef<
     }
   }, [shouldScrollToLastStart, items]);
 
-  const initialScrollDoneRef = useRef(false);
-  useEffect(() => {
-    if (!loading && items.length > 0 && !initialScrollDoneRef.current) {
-      initialScrollDoneRef.current = true;
-      requestAnimationFrame(() => {
-        virtuosoRef.current?.scrollToIndex({
-          index: items.length - 1,
-          align: 'end',
-          behavior: 'auto',
-        });
-      });
-    }
-  }, [loading, items.length]);
-
-  useEffect(() => {
-    initialScrollDoneRef.current = false;
-  }, [attempt.id]);
 
   const hasContent = !loading || items.length > 0;
 
