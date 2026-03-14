@@ -86,7 +86,7 @@ export function WorkspacesMain({
               </div>
             ) : (
               <div className="flex-1 min-h-0 overflow-hidden relative">
-                <div className="w-chat max-w-full absolute inset-0 mx-auto">
+                <div className="w-chat max-w-full absolute inset-0 mx-auto flex flex-col">
                   <RetryUiProvider attemptId={workspaceWithSession.id}>
                     <ConversationList
                       ref={conversationListRef}

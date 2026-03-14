@@ -377,13 +377,14 @@ export const ConversationList = forwardRef<
     <ApprovalFormProvider>
       <div
         className={cn(
-          'h-full transition-opacity duration-300',
+          'flex-1 min-h-0 transition-opacity duration-300',
           hasContent ? 'opacity-100' : 'opacity-0'
         )}
       >
         <Virtuoso<DisplayEntry, MessageListContext>
           ref={virtuosoRef}
-          className="h-full scrollbar-none"
+          className="scrollbar-none"
+          style={{ height: '100%' }}
           data={items}
           context={messageListContext}
           computeItemKey={computeItemKey}
