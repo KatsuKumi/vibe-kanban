@@ -96,6 +96,7 @@ export const ConversationList = forwardRef<
     startIndex: 0,
     endIndex: 0,
   });
+  const scrollerElRef = useRef<HTMLElement | null>(null);
 
   let repos: RepoWithTargetBranch[] = [];
   try {
@@ -189,6 +190,7 @@ export const ConversationList = forwardRef<
       const aggregatedEntries = aggregateConsecutiveEntries(pending.entries);
 
       const visibleEntries = aggregatedEntries.filter((entry) => {
+        if (entry.type === 'DIFF') return false;
         if (entry.type !== 'NORMALIZED_ENTRY') return true;
         const entryType = entry.content.entry_type.type;
         return (
@@ -302,6 +304,43 @@ export const ConversationList = forwardRef<
   }, [shouldScrollToLastStart, items]);
 
 
+  const scrollerRef = useCallback((el: HTMLElement | Window | null) => {
+    if (el instanceof HTMLElement) {
+      scrollerElRef.current = el;
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!shouldFollowOutput) return;
+
+    let userScrolledUp = false;
+
+    const el = scrollerElRef.current;
+    if (!el) return;
+
+    const onWheel = (e: WheelEvent) => {
+      if (e.deltaY < 0) userScrolledUp = true;
+    };
+    el.addEventListener('wheel', onWheel, { passive: true });
+
+    let rafId: number;
+    const tick = () => {
+      if (!userScrolledUp) {
+        const maxScroll = el.scrollHeight - el.clientHeight;
+        if (maxScroll - el.scrollTop > 1) {
+          el.scrollTop = maxScroll;
+        }
+      }
+      rafId = requestAnimationFrame(tick);
+    };
+    rafId = requestAnimationFrame(tick);
+
+    return () => {
+      el.removeEventListener('wheel', onWheel);
+      cancelAnimationFrame(rafId);
+    };
+  }, [shouldFollowOutput]);
+
   const hasContent = !loading || items.length > 0;
 
   const itemContent = useCallback(
@@ -357,7 +396,7 @@ export const ConversationList = forwardRef<
         );
       }
 
-      return null;
+      return <div aria-hidden />;
     },
     []
   );
@@ -365,14 +404,6 @@ export const ConversationList = forwardRef<
   const computeItemKey = useCallback(
     (_index: number, data: DisplayEntry) => `conv-${data.patchKey}`,
     []
-  );
-
-  const followOutput = useCallback(
-    (_isAtBottom: boolean) => {
-      if (shouldFollowOutput) return 'auto';
-      return false;
-    },
-    [shouldFollowOutput]
   );
 
   const components = useMemo(
@@ -393,14 +424,13 @@ export const ConversationList = forwardRef<
       >
         <Virtuoso<DisplayEntry, MessageListContext>
           ref={virtuosoRef}
+          scrollerRef={scrollerRef}
           className="scrollbar-none"
           style={{ height: '100%' }}
           data={items}
           context={messageListContext}
           computeItemKey={computeItemKey}
           itemContent={itemContent}
-          followOutput={followOutput}
-          alignToBottom
           initialTopMostItemIndex={items.length > 0 ? items.length - 1 : 0}
           rangeChanged={handleRangeChanged}
           components={components}
