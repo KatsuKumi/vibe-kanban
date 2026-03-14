@@ -359,7 +359,7 @@ export const ConversationList = forwardRef<
 
   const followOutput = useCallback(
     (_isAtBottom: boolean) => {
-      if (shouldFollowOutput) return 'smooth';
+      if (shouldFollowOutput) return 'auto';
       return false;
     },
     [shouldFollowOutput]
@@ -389,6 +389,7 @@ export const ConversationList = forwardRef<
           computeItemKey={computeItemKey}
           itemContent={itemContent}
           followOutput={followOutput}
+          alignToBottom
           initialTopMostItemIndex={items.length > 0 ? items.length - 1 : 0}
           rangeChanged={handleRangeChanged}
           components={components}
