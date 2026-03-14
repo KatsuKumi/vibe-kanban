@@ -188,7 +188,17 @@ export const ConversationList = forwardRef<
 
       const aggregatedEntries = aggregateConsecutiveEntries(pending.entries);
 
-      setItems(aggregatedEntries);
+      const visibleEntries = aggregatedEntries.filter((entry) => {
+        if (entry.type !== 'NORMALIZED_ENTRY') return true;
+        const entryType = entry.content.entry_type.type;
+        return (
+          entryType !== 'next_action' &&
+          entryType !== 'token_usage_info' &&
+          entryType !== 'rate_limit_info'
+        );
+      });
+
+      setItems(visibleEntries);
       setEntries(pending.entries);
 
       if (loading) {
