@@ -178,6 +178,9 @@ export const ConversationList = forwardRef<
       } else if (pending.addType === 'running' && !loading) {
         setShouldFollowOutput(true);
         setShouldScrollToLastStart(false);
+      } else if (loading && !pending.loading) {
+        setShouldFollowOutput(true);
+        setShouldScrollToLastStart(false);
       } else {
         setShouldFollowOutput(false);
         setShouldScrollToLastStart(false);
@@ -287,6 +290,20 @@ export const ConversationList = forwardRef<
       setShouldScrollToLastStart(false);
     }
   }, [shouldScrollToLastStart, items]);
+
+  const prevLoadingRef = useRef(true);
+  useEffect(() => {
+    if (prevLoadingRef.current && !loading && items.length > 0) {
+      requestAnimationFrame(() => {
+        virtuosoRef.current?.scrollToIndex({
+          index: items.length - 1,
+          align: 'end',
+          behavior: 'auto',
+        });
+      });
+    }
+    prevLoadingRef.current = loading;
+  }, [loading, items.length]);
 
   const hasContent = !loading || items.length > 0;
 
