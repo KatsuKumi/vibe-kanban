@@ -390,7 +390,6 @@ export const ConversationList = forwardRef<
           itemContent={itemContent}
           followOutput={followOutput}
           initialTopMostItemIndex={items.length > 0 ? items.length - 1 : 0}
-          alignToBottom
           rangeChanged={handleRangeChanged}
           components={components}
         />
