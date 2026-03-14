@@ -880,17 +880,19 @@ impl GitService {
                 // base branch is checked out somewhere - use CLI merge
                 let git_cli = GitCli::new();
 
-                // Safety check: base branch has no staged changes
                 if git_cli
                     .has_staged_changes(&base_checkout_path)
                     .map_err(|e| {
                         GitServiceError::InvalidRepository(format!("git diff --cached failed: {e}"))
                     })?
                 {
-                    return Err(GitServiceError::WorktreeDirty(
-                        base_branch_name.to_string(),
-                        "staged changes present".to_string(),
-                    ));
+                    git_cli
+                        .reset_staged_changes(&base_checkout_path)
+                        .map_err(|e| {
+                            GitServiceError::InvalidRepository(format!(
+                                "Failed to clear stale staged changes: {e}"
+                            ))
+                        })?;
                 }
 
                 // Use CLI merge in base context

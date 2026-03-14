@@ -552,25 +552,21 @@ fn merge_does_not_touch_tracked_uncommitted_changes_in_base_worktree() {
 }
 
 #[test]
-fn merge_refuses_with_staged_changes_on_base() {
+fn merge_clears_stale_staged_changes_on_base() {
     let td = TempDir::new().unwrap();
     let (repo_path, worktree_path) = setup_repo_with_worktree(&td);
     let s = GitService::new();
-    // ensure main is checked out
     let repo = Repository::open(&repo_path).unwrap();
     checkout_branch(&repo, "main");
-    // feature adds change and commits
     write_file(&worktree_path, "m.txt", "feature\n");
     let wt_repo = Repository::open(&worktree_path).unwrap();
     commit_all(&wt_repo, "feat change");
-    // main has staged change
     write_file(&repo_path, "staged.txt", "staged\n");
     add_path(&repo_path, "staged.txt");
     let res = s.merge_changes(&repo_path, &worktree_path, "feature", "main", "squash");
-    assert!(res.is_err(), "should refuse merge due to staged changes");
-    // staged file remains
+    assert!(res.is_ok(), "merge should succeed after clearing stale staged changes");
     let content = std::fs::read_to_string(repo_path.join("staged.txt")).unwrap();
-    assert_eq!(content, "staged\n");
+    assert_eq!(content, "staged\n", "unstaged file should still exist on disk");
 }
 
 #[test]

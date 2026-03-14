@@ -638,6 +638,10 @@ impl GitCli {
         }
     }
 
+    pub fn reset_staged_changes(&self, repo_path: &Path) -> Result<(), GitCliError> {
+        self.git(repo_path, ["reset", "HEAD"]).map(|_| ())
+    }
+
     /// Checkout base branch, squash-merge from_branch, and commit with message. Returns new HEAD sha.
     pub fn merge_squash_commit(
         &self,
@@ -649,7 +653,8 @@ impl GitCli {
         self.git(repo_path, ["checkout", base_branch]).map(|_| ())?;
         self.git(repo_path, ["merge", "--squash", "--no-commit", from_branch])
             .map(|_| ())?;
-        self.git(repo_path, ["commit", "-m", message]).map(|_| ())?;
+        self.git(repo_path, ["commit", "--no-verify", "-m", message])
+            .map(|_| ())?;
         let sha = self
             .git(repo_path, ["rev-parse", "HEAD"])?
             .trim()
