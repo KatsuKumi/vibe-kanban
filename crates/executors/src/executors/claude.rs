@@ -459,6 +459,8 @@ impl ClaudeCode {
             command.env("CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS", "1");
         }
 
+        command.env("CLAUDE_AUTOCOMPACT_PCT_OVERRIDE", "0");
+
         let mut child = command.group_spawn()?;
         let child_stdout = child.inner().stdout.take().ok_or_else(|| {
             ExecutorError::Io(std::io::Error::other("Claude Code missing stdout"))
