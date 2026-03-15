@@ -63,6 +63,27 @@
       "format": "uint32",
       "minimum": 0
     },
+    "thinking": {
+      "title": "Thinking Mode",
+      "description": "Controls extended thinking: 'adaptive' (model decides), 'enabled' (with thinking_budget), or 'disabled'",
+      "enum": ["adaptive", "enabled", "disabled", null]
+    },
+    "effort": {
+      "title": "Effort Level",
+      "description": "Controls reasoning depth: 'low', 'medium', 'high', or 'max'",
+      "enum": ["low", "medium", "high", "max", null]
+    },
+    "betas": {
+      "title": "SDK Betas",
+      "description": "Beta features to enable, e.g. ['context-1m-2025-08-07']",
+      "type": [
+        "array",
+        "null"
+      ],
+      "items": {
+        "type": "string"
+      }
+    },
     "base_command_override": {
       "title": "Base Command Override",
       "description": "Override the base command with a custom command",
