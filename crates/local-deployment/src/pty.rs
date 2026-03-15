@@ -29,6 +29,7 @@ pub enum PtyError {
 struct PtySession {
     writer: Box<dyn Write + Send>,
     master: Box<dyn portable_pty::MasterPty + Send>,
+    killer: Box<dyn portable_pty::ChildKiller + Send + Sync>,
     _output_handle: thread::JoinHandle<()>,
     closed: bool,
 }
@@ -94,10 +95,12 @@ impl PtyService {
             cmd.env("TERM", "xterm-256color");
             cmd.env("COLORTERM", "truecolor");
 
-            let child = pty_pair
+            let mut child = pty_pair
                 .slave
                 .spawn_command(cmd)
                 .map_err(|e| PtyError::CreateFailed(e.to_string()))?;
+
+            let killer = child.clone_killer();
 
             let mut writer = pty_pair
                 .master
@@ -129,19 +132,20 @@ impl PtyService {
                         Err(_) => break,
                     }
                 }
-                drop(child);
+                let _ = child.wait();
             });
 
-            Ok::<_, PtyError>((pty_pair.master, writer, output_handle))
+            Ok::<_, PtyError>((pty_pair.master, writer, killer, output_handle))
         })
         .await
         .map_err(|e| PtyError::CreateFailed(e.to_string()))??;
 
-        let (master, writer, output_handle) = result;
+        let (master, writer, killer, output_handle) = result;
 
         let session = PtySession {
             writer,
             master,
+            killer,
             _output_handle: output_handle,
             closed: false,
         };
@@ -214,6 +218,7 @@ impl PtyService {
             .remove(&session_id)
         {
             session.closed = true;
+            let _ = session.killer.kill();
         }
         Ok(())
     }

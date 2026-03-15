@@ -172,14 +172,6 @@ impl GiteaProvider {
     }
 
     fn get_git_credentials(base_url: &str) -> Option<(String, String)> {
-        let output = std::process::Command::new("git")
-            .args(["credential", "fill"])
-            .stdin(std::process::Stdio::piped())
-            .stdout(std::process::Stdio::piped())
-            .stderr(std::process::Stdio::null())
-            .spawn()
-            .ok()?;
-
         let url = Url::parse(base_url).ok()?;
         let host = url.host_str()?;
         let protocol = url.scheme();
@@ -197,7 +189,6 @@ impl GiteaProvider {
             .ok()?;
 
         child.stdin.as_mut()?.write_all(input.as_bytes()).ok()?;
-        drop(output);
 
         let output = child.wait_with_output().ok()?;
         let stdout = String::from_utf8_lossy(&output.stdout);
