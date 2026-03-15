@@ -66,7 +66,7 @@ fn base_command_cli(claude_code_router: bool) -> &'static str {
     if claude_code_router {
         "npx -y @musistudio/claude-code-router@1.0.66 code"
     } else {
-        "npx -y @anthropic-ai/claude-code@2.1.32"
+        "npx -y @anthropic-ai/claude-code@2.1.76"
     }
 }
 
@@ -97,6 +97,24 @@ pub struct ClaudeCode {
     pub agent_teams: Option<bool>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub thinking_budget: Option<u32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schemars(
+        title = "Thinking Mode",
+        description = "Controls extended thinking: 'adaptive' (model decides), 'enabled' (with thinking_budget), or 'disabled'"
+    )]
+    pub thinking: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schemars(
+        title = "Effort Level",
+        description = "Controls reasoning depth: 'low', 'medium', 'high', or 'max'"
+    )]
+    pub effort: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schemars(
+        title = "SDK Betas",
+        description = "Beta features to enable, e.g. ['context-1m-2025-08-07']"
+    )]
+    pub betas: Option<Vec<String>>,
     #[serde(flatten)]
     pub cmd: CmdOverrides,
 
@@ -206,6 +224,43 @@ impl ClaudeCode {
         }
 
         Some(serde_json::Value::Object(hooks))
+    }
+
+    fn build_thinking_config(&self) -> Option<serde_json::Value> {
+        match self.thinking.as_deref() {
+            Some("adaptive") => Some(serde_json::json!({"type": "adaptive"})),
+            Some("disabled") => Some(serde_json::json!({"type": "disabled"})),
+            Some("enabled") => Some(serde_json::json!({
+                "type": "enabled",
+                "budgetTokens": self.thinking_budget.unwrap_or(10000)
+            })),
+            None if self.thinking_budget.is_some() => Some(serde_json::json!({
+                "type": "enabled",
+                "budgetTokens": self.thinking_budget.unwrap()
+            })),
+            _ => None,
+        }
+    }
+
+    fn effective_betas(&self) -> Vec<String> {
+        self.betas
+            .clone()
+            .unwrap_or_else(|| vec!["context-1m-2025-08-07".to_string()])
+    }
+
+    fn build_bridge_env(&self) -> Option<HashMap<String, String>> {
+        let mut env = self.cmd.env.clone().unwrap_or_default();
+        if self.agent_teams.unwrap_or(false) {
+            env.insert(
+                "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS".to_string(),
+                "1".to_string(),
+            );
+        }
+        if env.is_empty() {
+            None
+        } else {
+            Some(env)
+        }
     }
 }
 
@@ -382,11 +437,13 @@ impl ClaudeCode {
             disallowed_tools: vec![],
             include_partial_messages: true,
             dangerously_skip_permissions: self.dangerously_skip_permissions.unwrap_or(false),
-            max_thinking_tokens: self.thinking_budget,
+            thinking: self.build_thinking_config(),
+            effort: self.effort.clone(),
+            betas: Some(self.effective_betas()),
             hooks: self.get_hooks(env.commit_reminder),
             resume: resume_session_id.map(String::from),
             resume_at: resume_at_message_id.map(String::from),
-            env: self.cmd.env.clone(),
+            env: self.build_bridge_env(),
             path_to_claude_code_executable: None,
         };
 
@@ -2611,6 +2668,9 @@ mod tests {
             disable_api_key: None,
             agent_teams: None,
             thinking_budget: None,
+            thinking: None,
+            effort: None,
+            betas: None,
         };
         let msg_store = Arc::new(MsgStore::new());
         let current_dir = std::path::PathBuf::from("/tmp/test-worktree");

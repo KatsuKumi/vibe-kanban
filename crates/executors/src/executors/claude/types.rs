@@ -260,7 +260,11 @@ pub struct BridgeConfig {
     pub include_partial_messages: bool,
     pub dangerously_skip_permissions: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub max_thinking_tokens: Option<u32>,
+    pub thinking: Option<Value>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub effort: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub betas: Option<Vec<String>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub hooks: Option<Value>,
     #[serde(skip_serializing_if = "Option::is_none")]

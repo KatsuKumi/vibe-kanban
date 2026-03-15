@@ -276,8 +276,16 @@ async function main() {
     options.model = config.model;
   }
 
-  if (config.max_thinking_tokens != null) {
-    options.maxThinkingTokens = config.max_thinking_tokens;
+  if (config.thinking) {
+    options.thinking = config.thinking;
+  }
+
+  if (config.effort) {
+    options.effort = config.effort;
+  }
+
+  if (config.betas && config.betas.length > 0) {
+    options.betas = config.betas;
   }
 
   if (config.dangerously_skip_permissions) {

@@ -29,7 +29,7 @@
       },
       "THINKING": {
         "CLAUDE_CODE": {
-          "thinking_budget": 10000,
+          "thinking": "adaptive",
           "dangerously_skip_permissions": true
         }
       }
