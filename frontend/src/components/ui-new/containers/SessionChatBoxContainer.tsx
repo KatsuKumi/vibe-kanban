@@ -199,6 +199,7 @@ export function SessionChatBoxContainer(props: SessionChatBoxContainerProps) {
   // Get repos for file search
   const { repos } = useAttemptRepo(workspaceId);
   const repoIds = repos.map((r) => r.id);
+  const repoId = repos.length === 1 ? repos[0]?.id : undefined;
 
   // Approval feedback context
   const feedbackContext = useApprovalFeedbackOptional();
@@ -723,6 +724,7 @@ export function SessionChatBoxContainer(props: SessionChatBoxContainerProps) {
       onScrollToPreviousMessage={onScrollToPreviousMessage}
       repoIds={repoIds}
       projectId={projectId}
+      repoId={repoId}
       tokenUsageInfo={tokenUsageInfo}
       editor={{
         value: editorValue,

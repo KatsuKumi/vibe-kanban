@@ -1154,10 +1154,18 @@ impl ClaudeLogProcessor {
                     .as_ref()
                     .and_then(|id| self.streaming_messages.remove(id));
 
-                for (content_index, item) in message.content.items().enumerate() {
-                    let entry_index = streaming_message_state
-                        .as_mut()
-                        .and_then(|state| state.content_entry_index(content_index));
+                for (_content_index, item) in message.content.items().enumerate() {
+                    let entry_index = streaming_message_state.as_mut().and_then(|state| {
+                        match item {
+                            ClaudeContentItem::Text { .. } => {
+                                state.take_entry_index_by_kind(StreamingContentKind::Text)
+                            }
+                            ClaudeContentItem::Thinking { .. } => {
+                                state.take_entry_index_by_kind(StreamingContentKind::Thinking)
+                            }
+                            _ => None,
+                        }
+                    });
 
                     match item {
                         ClaudeContentItem::ToolUse { id, tool_data } => {
@@ -1571,9 +1579,7 @@ impl ClaudeLogProcessor {
                     }
                 }
                 ClaudeStreamEvent::MessageStop => {
-                    if let Some(message_id) = self.streaming_message_id.take() {
-                        let _ = self.streaming_messages.remove(&message_id);
-                    }
+                    self.streaming_message_id = None;
                 }
                 ClaudeStreamEvent::Unknown => {}
             },
@@ -1920,6 +1926,18 @@ impl StreamingMessageState {
         self.contents
             .get(&content_index)
             .and_then(|s| s.entry_index)
+    }
+
+    fn take_entry_index_by_kind(&mut self, kind: StreamingContentKind) -> Option<usize> {
+        let matching_key = self.contents.iter().find_map(|(&key, state)| {
+            if state.kind == kind && state.entry_index.is_some() {
+                Some(key)
+            } else {
+                None
+            }
+        });
+
+        matching_key.and_then(|key| self.contents.get_mut(&key).and_then(|s| s.entry_index.take()))
     }
 }
 

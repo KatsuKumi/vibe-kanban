@@ -145,6 +145,7 @@ interface SessionChatBoxProps {
   error?: string | null;
   repoIds?: string[];
   projectId?: string;
+  repoId?: string;
   agent?: BaseCodingAgent | null;
   executor?: ExecutorProps;
   todos?: TodoItem[];
@@ -175,6 +176,7 @@ export function SessionChatBox({
   error,
   repoIds,
   projectId,
+  repoId,
   agent,
   executor,
   todos,
@@ -520,6 +522,7 @@ export function SessionChatBox({
       disabled={isDisabled}
       repoIds={repoIds}
       projectId={projectId}
+      repoId={repoId}
       executor={agent || executor?.selected}
       autoFocus={true}
       focusKey={focusKey}

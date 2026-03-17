@@ -133,7 +133,19 @@ pub trait ContainerService {
         } else {
             None
         }
-        .unwrap_or_else(|| std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")));
+        .unwrap_or_else(|| {
+            let cwd = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
+            tracing::warn!(
+                fallback_dir = %cwd.display(),
+                "Slash commands: no workspace or repo resolved, falling back to CWD"
+            );
+            cwd
+        });
+
+        tracing::info!(
+            agent_workdir = %agent_workdir.display(),
+            "Slash commands: resolved working directory"
+        );
 
         #[cfg(feature = "qa-mode")]
         {

@@ -4,7 +4,7 @@ use axum::{
     response::Json as ResponseJson,
     routing::get,
 };
-use db::models::workspace::{Workspace, WorkspaceContext};
+use db::models::workspace::{Workspace, WorkspaceContext, WorkspaceError};
 use deployment::Deployment;
 use serde::{Deserialize, Serialize};
 use utils::response::ApiResponse;
@@ -32,7 +32,14 @@ pub async fn get_container_info(
     let info =
         Workspace::resolve_container_ref_by_prefix(&deployment.db().pool, &query.container_ref)
             .await
-            .map_err(ApiError::Database)?;
+            .map_err(|e| match e {
+                sqlx::Error::RowNotFound => {
+                    ApiError::Workspace(WorkspaceError::ValidationError(
+                        format!("No workspace found for container ref '{}'", query.container_ref),
+                    ))
+                }
+                other => ApiError::Database(other),
+            })?;
 
     Ok(ResponseJson(ApiResponse::success(ContainerInfo {
         project_id: info.project_id,
@@ -59,6 +66,11 @@ pub async fn get_context(
             .await?;
             Ok(ResponseJson(ApiResponse::success(ctx)))
         }
+        Err(sqlx::Error::RowNotFound) => Err(ApiError::Workspace(
+            WorkspaceError::ValidationError(
+                format!("No workspace found for container ref '{}'", payload.container_ref),
+            ),
+        )),
         Err(e) => Err(ApiError::Database(e)),
     }
 }

@@ -205,12 +205,19 @@ impl ClaudeCode {
         let command_parts = command_builder.build_initial()?;
         let (program_path, args) = command_parts.into_resolved().await?;
 
+        tracing::info!(
+            dir = %current_dir.display(),
+            program = %program_path.display(),
+            ?args,
+            "Starting slash commands discovery"
+        );
+
         let mut command = Command::new(program_path);
         command
             .kill_on_drop(true)
             .stdin(Stdio::null())
             .stdout(Stdio::piped())
-            .stderr(Stdio::null())
+            .stderr(Stdio::piped())
             .current_dir(current_dir)
             .args(&args);
 
@@ -226,6 +233,21 @@ impl ClaudeCode {
         let stdout = child.inner().stdout.take().ok_or_else(|| {
             ExecutorError::Io(std::io::Error::other("Claude Code missing stdout"))
         })?;
+        let stderr = child.inner().stderr.take();
+
+        let stderr_task = tokio::spawn(async move {
+            if let Some(stderr) = stderr {
+                let mut stderr_lines = BufReader::new(stderr).lines();
+                let mut stderr_output = String::new();
+                while let Ok(Some(line)) = stderr_lines.next_line().await {
+                    stderr_output.push_str(&line);
+                    stderr_output.push('\n');
+                }
+                stderr_output
+            } else {
+                String::new()
+            }
+        });
 
         let mut lines = BufReader::new(stdout).lines();
 
@@ -252,12 +274,36 @@ impl ClaudeCode {
         let res = tokio::time::timeout(SLASH_COMMANDS_DISCOVERY_TIMEOUT, discovery).await;
         let _ = child.kill().await;
 
+        let stderr_output = stderr_task.await.unwrap_or_default();
+        if !stderr_output.trim().is_empty() {
+            tracing::warn!(
+                dir = %current_dir.display(),
+                stderr = %stderr_output.trim(),
+                "Slash commands discovery stderr"
+            );
+        }
+
         match res {
-            Ok(Ok(())) => Ok(discovered.unwrap_or_else(|| (vec![], vec![]))),
-            Ok(Err(e)) => Err(e),
-            Err(_) => Err(ExecutorError::Io(std::io::Error::other(
-                "Timed out discovering Claude Code slash commands",
-            ))),
+            Ok(Ok(())) => {
+                let (names, plugins) = discovered.unwrap_or_else(|| (vec![], vec![]));
+                tracing::info!(
+                    dir = %current_dir.display(),
+                    command_count = names.len(),
+                    plugin_count = plugins.len(),
+                    "Slash commands discovery completed"
+                );
+                Ok((names, plugins))
+            }
+            Ok(Err(e)) => {
+                tracing::error!(dir = %current_dir.display(), error = %e, "Slash commands discovery failed");
+                Err(e)
+            }
+            Err(_) => {
+                tracing::error!(dir = %current_dir.display(), "Slash commands discovery timed out (120s)");
+                Err(ExecutorError::Io(std::io::Error::other(
+                    "Timed out discovering Claude Code slash commands",
+                )))
+            }
         }
     }
 
@@ -275,13 +321,19 @@ impl ClaudeCode {
             .discover_available_command_and_plugins(current_dir)
             .await?;
 
-        // Run file walk to discover command descriptions, including from plugins
         let current_dir_owned = current_dir.to_owned();
         let descriptions = tokio::task::spawn_blocking(move || {
             Self::discover_custom_command_descriptions(&current_dir_owned, &plugins)
         })
         .await
         .map_err(|e| ExecutorError::Io(std::io::Error::other(e)))?;
+
+        tracing::info!(
+            dir = %current_dir.display(),
+            subprocess_names = ?names,
+            file_walk_descriptions = ?descriptions.keys().collect::<Vec<_>>(),
+            "Slash commands: merging subprocess names with file walk descriptions"
+        );
 
         let builtin: HashSet<String> = Self::hardcoded_slash_commands()
             .iter()
@@ -301,6 +353,13 @@ impl ClaudeCode {
                 description: descriptions.get(&name).cloned(),
             })
             .collect();
+
+        tracing::info!(
+            dir = %current_dir.display(),
+            final_count = commands.len(),
+            commands = ?commands.iter().map(|c| &c.name).collect::<Vec<_>>(),
+            "Slash commands discovery final result"
+        );
 
         SlashCommandCache::instance().put(key, commands.clone());
 

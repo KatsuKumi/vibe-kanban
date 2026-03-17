@@ -90,8 +90,22 @@ impl Approvals {
         let req_id = request.id.clone();
 
         if let Some(store) = self.msg_store_by_id(&request.execution_process_id).await {
-            // Find the matching tool use entry by name and input
-            let matching_tool = find_matching_tool_use(store.clone(), &request.tool_call_id);
+            let mut matching_tool = find_matching_tool_use(store.clone(), &request.tool_call_id);
+
+            if matching_tool.is_none() {
+                for attempt in 1..=5 {
+                    tokio::time::sleep(tokio::time::Duration::from_millis(50 * attempt)).await;
+                    matching_tool =
+                        find_matching_tool_use(store.clone(), &request.tool_call_id);
+                    if matching_tool.is_some() {
+                        tracing::debug!(
+                            "Found matching tool use entry on retry attempt {attempt} for tool_call_id='{}'",
+                            request.tool_call_id
+                        );
+                        break;
+                    }
+                }
+            }
 
             if let Some((idx, matching_tool)) = matching_tool {
                 let include_input = request.tool_name == "AskUserQuestion";

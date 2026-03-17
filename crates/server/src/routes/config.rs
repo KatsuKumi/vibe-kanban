@@ -498,6 +498,13 @@ async fn handle_agent_slash_commands_ws(
 
     tokio::spawn(async move { while let Some(Ok(_)) = receiver.next().await {} });
 
+    tracing::info!(
+        executor = ?query.executor,
+        workspace_id = ?query.workspace_id,
+        repo_id = ?query.repo_id,
+        "Slash commands WS: received request"
+    );
+
     match deployment
         .container()
         .available_agent_slash_commands(
